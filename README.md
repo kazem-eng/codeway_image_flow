@@ -13,8 +13,6 @@ A Flutter application for image processing and analysis using Google ML Kit. The
 - [Dependencies](#-dependencies)
 - [Architecture Details](#️-architecture-details)
 - [Testing](#-testing)
-- [Code Style](#-code-style)
-- [Development Guidelines](#-development-guidelines)
 - [Troubleshooting](#-troubleshooting)
 
 ## 📱 Features
@@ -139,43 +137,10 @@ Before you begin, ensure you have the following installed:
 
 ## 🚀 How to Run
 
-### Run on iOS Simulator
+From the project root:
 ```bash
-flutter run -d ios
-```
-
-Or use the provided script:
-```bash
-./run_ios.sh
-```
-
-### Run on Android Emulator/Device
-```bash
-flutter run -d android
-```
-
-### Run on macOS
-```bash
-flutter run -d macos
-```
-
-### Run on Web
-```bash
-flutter run -d chrome
-```
-
-### Build for Production
-
-**iOS:**
-```bash
-flutter build ios --release
-```
-
-**Android:**
-```bash
-flutter build apk --release
-# or
-flutter build appbundle --release
+flutter pub get
+flutter run
 ```
 
 ## 📚 Dependencies
@@ -299,38 +264,6 @@ The project includes comprehensive unit tests for:
 
 See `test/README.md` for detailed test documentation.
 
-## 📝 Code Style
-
-The project follows Flutter/Dart style guidelines:
-- Uses `flutter_lints` package
-- Follows Dart style guide
-- Private members prefixed with `_`
-- Widget files prefixed with `_` are private to their feature
-
-## 🔧 Development Guidelines
-
-### Adding a New Feature
-
-1. Create feature folder under `lib/features/`
-2. Structure: `data/`, `domain/`, `presentation/`
-3. Create ViewModel extending base classes
-4. Register services in `setup/locator.dart`
-5. Add routes in `routes.dart` and `routes_handler.dart`
-
-### Adding a New Service
-
-1. Create interface in `base/services/[service_name]/i_[service_name].dart`
-2. Implement in `base/services/[service_name]/[service_name].dart`
-3. Register in `setup/locator.dart`
-4. Export in `services_export.dart`
-
-### State Management Best Practices
-
-- Use `BaseState` wrapper for all ViewModel states
-- Handle loading, success, and error states
-- Preserve model data in error states for retry
-- Use `maybeWhen` for reactive UI updates
-
 ## 🐛 Troubleshooting
 
 ### iOS Build Issues
@@ -350,15 +283,6 @@ The project follows Flutter/Dart style guidelines:
 ## 📄 License
 
 This project is private and proprietary.
-
-## 👥 Contributing
-
-This is a private project. For questions or issues, please contact the project maintainers.
-
-## 📞 Support
-
-For issues or questions, please refer to the project documentation or contact the development team.
-
 ---
 
 **Built with Flutter** 💙

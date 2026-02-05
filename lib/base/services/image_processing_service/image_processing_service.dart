@@ -27,9 +27,21 @@ class ImageProcessingService implements IImageProcessingService {
       final orientedBytes = Uint8List.fromList(
         img.encodeJpg(oriented, quality: 90),
       );
+      
+      // First check for faces - if no faces detected, treat as document
       final faces = await _detectFaces(orientedBytes);
-      final blocks = await _detectTextBlocks(orientedBytes);
+      if (faces.isEmpty) {
+        // No faces detected - check for text/document content
+        final blocks = await _detectTextBlocks(orientedBytes);
+        if (blocks.isNotEmpty || _hasDocumentLikeFeatures(oriented)) {
+          return ProcessingType.document;
+        }
+        // Default to document if no faces and unclear content
+        return ProcessingType.document;
+      }
 
+      // Faces detected - compare with text content
+      final blocks = await _detectTextBlocks(orientedBytes);
       final imageArea = oriented.width * oriented.height.toDouble();
       final faceScore = _maxFaceAreaRatio(faces, imageArea);
       final textScore = _textBoundsAreaRatio(blocks, imageArea);
@@ -47,6 +59,31 @@ class ImageProcessingService implements IImageProcessingService {
     } catch (e) {
       throw ImageProcessingException(message: e.toString());
     }
+  }
+
+  /// Check if image has document-like features (edges, structure)
+  bool _hasDocumentLikeFeatures(img.Image image) {
+    // Simple heuristic: check for high contrast edges
+    // Documents typically have more structured edges than photos
+    final grayscale = img.grayscale(image.clone());
+    final edges = img.sobel(grayscale);
+    
+    // Count edge pixels (pixels with high gradient)
+    int edgePixelCount = 0;
+    final threshold = 50; // Adjust based on testing
+    for (var y = 0; y < edges.height; y++) {
+      for (var x = 0; x < edges.width; x++) {
+        final pixel = edges.getPixel(x, y);
+        final intensity = pixel.r; // Grayscale, so r=g=b
+        if (intensity > threshold) {
+          edgePixelCount++;
+        }
+      }
+    }
+    
+    final edgeRatio = edgePixelCount / (edges.width * edges.height);
+    // Documents typically have 5-15% edge pixels
+    return edgeRatio > 0.05;
   }
 
   double _maxFaceAreaRatio(List<Face> faces, double imageArea) {
@@ -290,92 +327,14 @@ class ImageProcessingService implements IImageProcessingService {
     if (decoded == null) {
       throw ImageProcessingException(message: 'Failed to decode image');
     }
+    // Simple and robust: just fix orientation and pass the photo through.
+    // The resulting PDF will show exactly the captured image.
     final oriented = img.bakeOrientation(decoded);
-    final orientedBytes = Uint8List.fromList(
+    return Uint8List.fromList(
       img.encodeJpg(oriented, quality: 92),
     );
-
-    // Detect text blocks to find document boundaries
-    final blocks = await _detectTextBlocks(orientedBytes);
-
-    if (blocks.isEmpty) {
-      // No text detected - return original image
-      return orientedBytes;
-    }
-
-    // Calculate bounding box of all text blocks
-    final bounds = _calculateTextBounds(
-      blocks,
-      oriented.width,
-      oriented.height,
-    );
-    if (bounds == null) {
-      // Invalid bounds - return original image
-      return orientedBytes;
-    }
-
-    // Crop to document area with padding
-    final padding = 20;
-    final cropX = max(0, bounds.left.toInt() - padding);
-    final cropY = max(0, bounds.top.toInt() - padding);
-    final cropWidth = min(
-      oriented.width - cropX,
-      (bounds.right - bounds.left).toInt() + (padding * 2),
-    );
-    final cropHeight = min(
-      oriented.height - cropY,
-      (bounds.bottom - bounds.top).toInt() + (padding * 2),
-    );
-
-    if (cropWidth <= 0 || cropHeight <= 0) {
-      return orientedBytes;
-    }
-
-    // Crop the image
-    final cropped = img.copyCrop(
-      oriented,
-      x: cropX,
-      y: cropY,
-      width: cropWidth,
-      height: cropHeight,
-    );
-
-    // Enhance contrast and brightness for better readability
-    final enhanced = img.adjustColor(cropped, contrast: 1.15, brightness: 0.02);
-
-    return Uint8List.fromList(img.encodeJpg(enhanced, quality: 92));
   }
 
-  Rect? _calculateTextBounds(
-    List<TextBlock> blocks,
-    int imageWidth,
-    int imageHeight,
-  ) {
-    if (blocks.isEmpty) return null;
-
-    double minX = double.infinity;
-    double minY = double.infinity;
-    double maxX = 0;
-    double maxY = 0;
-
-    for (final block in blocks) {
-      final rect = block.boundingBox;
-      minX = min(minX, rect.left);
-      minY = min(minY, rect.top);
-      maxX = max(maxX, rect.right);
-      maxY = max(maxY, rect.bottom);
-    }
-
-    if (minX == double.infinity) return null;
-
-    // Clamp to image bounds
-    minX = minX.clamp(0.0, imageWidth.toDouble());
-    minY = minY.clamp(0.0, imageHeight.toDouble());
-    maxX = maxX.clamp(0.0, imageWidth.toDouble());
-    maxY = maxY.clamp(0.0, imageHeight.toDouble());
-
-    return Rect.fromLTRB(minX, minY, maxX, maxY);
-  }
 
   @override
   Future<Uint8List> createPdfFromImage(

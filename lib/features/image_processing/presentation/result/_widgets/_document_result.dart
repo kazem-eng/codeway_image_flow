@@ -25,8 +25,6 @@ class DocumentResultCard extends StatelessWidget {
         children: [
           Spacer(),
           Container(
-            width: MediaQuery.sizeOf(context).width * 0.3,
-            height: MediaQuery.sizeOf(context).height * 0.2,
             padding: const EdgeInsets.all(ImageFlowSizes.cardOuterPadding),
             decoration: ImageFlowDecorations.pdfCard(),
             child: Center(
