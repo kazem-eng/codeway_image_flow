@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
@@ -16,8 +17,20 @@ import 'i_image_processing_service.dart';
 
 /// Image processing using ML Kit (face + text) and image/pdf packages.
 class ImageProcessingService implements IImageProcessingService {
+  static const MethodChannel _nativeChannel = MethodChannel(
+    'codeway_image_processing/native_image_processing',
+  );
+
+  bool get _useNative => Platform.isIOS;
+
   @override
   Future<ProcessingType> detectContentType(Uint8List imageBytes) async {
+    // Always use Dart/ML Kit for face vs document detection.
+    // Native processing is reserved for document flow only.
+    return _detectContentTypeDart(imageBytes);
+  }
+
+  Future<ProcessingType> _detectContentTypeDart(Uint8List imageBytes) async {
     try {
       final decoded = img.decodeImage(imageBytes);
       if (decoded == null) {
@@ -169,6 +182,12 @@ class ImageProcessingService implements IImageProcessingService {
 
   @override
   Future<Uint8List> detectAndProcessFaces(Uint8List imageBytes) async {
+    // Always use Dart/ML Kit for face processing to ensure
+    // consistent behavior across camera/gallery sources.
+    return _detectAndProcessFacesDart(imageBytes);
+  }
+
+  Future<Uint8List> _detectAndProcessFacesDart(Uint8List imageBytes) async {
     final decoded = img.decodeImage(imageBytes);
     if (decoded == null) {
       throw ImageProcessingException(message: 'Failed to decode image');
@@ -323,6 +342,21 @@ class ImageProcessingService implements IImageProcessingService {
 
   @override
   Future<Uint8List> processDocument(Uint8List imageBytes) async {
+    if (_useNative) {
+      try {
+        final processed = await _nativeChannel.invokeMethod<Uint8List>(
+          'processDocument',
+          imageBytes,
+        );
+        if (processed != null) return processed;
+      } on PlatformException {
+        // Fall back to Dart implementation
+      }
+    }
+    return _processDocumentDart(imageBytes);
+  }
+
+  Future<Uint8List> _processDocumentDart(Uint8List imageBytes) async {
     final decoded = img.decodeImage(imageBytes);
     if (decoded == null) {
       throw ImageProcessingException(message: 'Failed to decode image');
@@ -338,6 +372,24 @@ class ImageProcessingService implements IImageProcessingService {
 
   @override
   Future<Uint8List> createPdfFromImage(
+    Uint8List imageBytes,
+    String title,
+  ) async {
+    if (_useNative) {
+      try {
+        final pdfBytes = await _nativeChannel.invokeMethod<Uint8List>(
+          'createPdfFromImage',
+          {'bytes': imageBytes, 'title': title},
+        );
+        if (pdfBytes != null) return pdfBytes;
+      } on PlatformException {
+        // Fall back to Dart implementation
+      }
+    }
+    return _createPdfFromImageDart(imageBytes, title);
+  }
+
+  Future<Uint8List> _createPdfFromImageDart(
     Uint8List imageBytes,
     String title,
   ) async {
