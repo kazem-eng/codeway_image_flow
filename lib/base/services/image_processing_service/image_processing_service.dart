@@ -21,7 +21,7 @@ class ImageProcessingService implements IImageProcessingService {
     'codeway_image_processing/native_image_processing',
   );
 
-  bool get _useNative => Platform.isIOS;
+  bool get _useNativeDoc => Platform.isIOS || Platform.isAndroid;
 
   @override
   Future<ProcessingType> detectContentType(Uint8List imageBytes) async {
@@ -342,7 +342,7 @@ class ImageProcessingService implements IImageProcessingService {
 
   @override
   Future<Uint8List> processDocument(Uint8List imageBytes) async {
-    if (_useNative) {
+    if (_useNativeDoc) {
       try {
         final processed = await _nativeChannel.invokeMethod<Uint8List>(
           'processDocument',
@@ -375,7 +375,7 @@ class ImageProcessingService implements IImageProcessingService {
     Uint8List imageBytes,
     String title,
   ) async {
-    if (_useNative) {
+    if (_useNativeDoc) {
       try {
         final pdfBytes = await _nativeChannel.invokeMethod<Uint8List>(
           'createPdfFromImage',
