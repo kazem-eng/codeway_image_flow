@@ -1,5 +1,6 @@
 import 'package:codeway_image_processing/base/base_exception.dart';
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
@@ -12,22 +13,24 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_model.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
-import 'package:open_filex/open_filex.dart';
 
 /// Home screen ViewModel.
 class HomeVM {
   HomeVM({
     required IProcessedImageRepository repository,
     required IFileStorageService fileStorageService,
+    required IFileOpenService fileOpenService,
     required INavigationService navigationService,
     required CaptureVM captureVm,
   }) : _repository = repository,
        _fileStorageService = fileStorageService,
+       _fileOpenService = fileOpenService,
        _navigationService = navigationService,
        _captureVm = captureVm;
 
   final IProcessedImageRepository _repository;
   final IFileStorageService _fileStorageService;
+  final IFileOpenService _fileOpenService;
   final INavigationService _navigationService;
   final CaptureVM _captureVm;
   final IToastService _toastService = Get.find<IToastService>();
@@ -52,6 +55,7 @@ class HomeVM {
     }
   }
 
+
   Future<void> deleteItem(String id) async {
     try {
       await _repository.init();
@@ -63,9 +67,9 @@ class HomeVM {
         await _repository.delete(id);
       }
       await loadHistory();
-      _toastService.show(AppStrings.itemDeleted);
+      _toastService.show(AppStrings.itemDeleted, type: ToastType.warning);
     } catch (e) {
-      _toastService.show(AppStrings.failedToDeleteItem);
+      _toastService.show(AppStrings.failedToDeleteItem, type: ToastType.error);
     }
   }
 
@@ -74,7 +78,7 @@ class HomeVM {
       await _captureVm.captureFromCamera();
       await loadHistory();
     } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage);
+      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
     }
   }
 
@@ -83,7 +87,7 @@ class HomeVM {
       await _captureVm.captureFromGallery();
       await loadHistory();
     } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage);
+      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
     }
   }
 
@@ -98,9 +102,9 @@ class HomeVM {
   Future<void> openPdf(ProcessedImage image) async {
     if (image.processingType != ProcessingType.document) return;
     try {
-      await OpenFilex.open(image.processedPath);
+      await _fileOpenService.open(image.processedPath);
     } catch (e) {
-      _toastService.show(AppStrings.fileNotFound);
+      _toastService.show(AppStrings.fileNotFound, type: ToastType.error);
     }
   }
 }

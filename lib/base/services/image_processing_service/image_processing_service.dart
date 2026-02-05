@@ -1,7 +1,5 @@
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -40,7 +38,7 @@ class ImageProcessingService implements IImageProcessingService {
       final orientedBytes = Uint8List.fromList(
         img.encodeJpg(oriented, quality: 90),
       );
-      
+
       // First check for faces - if no faces detected, treat as document
       final faces = await _detectFaces(orientedBytes);
       if (faces.isEmpty) {
@@ -80,7 +78,7 @@ class ImageProcessingService implements IImageProcessingService {
     // Documents typically have more structured edges than photos
     final grayscale = img.grayscale(image.clone());
     final edges = img.sobel(grayscale);
-    
+
     // Count edge pixels (pixels with high gradient)
     int edgePixelCount = 0;
     final threshold = 50; // Adjust based on testing
@@ -93,7 +91,7 @@ class ImageProcessingService implements IImageProcessingService {
         }
       }
     }
-    
+
     final edgeRatio = edgePixelCount / (edges.width * edges.height);
     // Documents typically have 5-15% edge pixels
     return edgeRatio > 0.05;
@@ -364,11 +362,8 @@ class ImageProcessingService implements IImageProcessingService {
     // Simple and robust: just fix orientation and pass the photo through.
     // The resulting PDF will show exactly the captured image.
     final oriented = img.bakeOrientation(decoded);
-    return Uint8List.fromList(
-      img.encodeJpg(oriented, quality: 92),
-    );
+    return Uint8List.fromList(img.encodeJpg(oriented, quality: 92));
   }
-
 
   @override
   Future<Uint8List> createPdfFromImage(
@@ -389,11 +384,23 @@ class ImageProcessingService implements IImageProcessingService {
     return _createPdfFromImageDart(imageBytes, title);
   }
 
+  @override
+  Future<Uint8List> createPdfFromImages(
+    List<Uint8List> imageBytes,
+    String title,
+  ) async {
+    if (imageBytes.isEmpty) {
+      throw ImageProcessingException(message: 'No pages provided');
+    }
+    // Use Dart PDF builder for multi-page documents.
+    return _createPdfFromImagesDart(imageBytes, title);
+  }
+
   Future<Uint8List> _createPdfFromImageDart(
     Uint8List imageBytes,
     String title,
   ) async {
-    final pdf = pdf_widgets.Document();
+    final pdf = pdf_widgets.Document(title: title);
     final imageProvider = pdf_widgets.MemoryImage(imageBytes);
 
     // A4 page dimensions in points
@@ -414,6 +421,36 @@ class ImageProcessingService implements IImageProcessingService {
         ),
       ),
     );
+    return Uint8List.fromList(await pdf.save());
+  }
+
+  Future<Uint8List> _createPdfFromImagesDart(
+    List<Uint8List> imageBytes,
+    String title,
+  ) async {
+    final pdf = pdf_widgets.Document(title: title);
+
+    final pageFormat = pdf_lib.PdfPageFormat.a4;
+    final pageWidth = pageFormat.width;
+    final pageHeight = pageFormat.height;
+
+    for (final bytes in imageBytes) {
+      final imageProvider = pdf_widgets.MemoryImage(bytes);
+      pdf.addPage(
+        pdf_widgets.Page(
+          pageFormat: pageFormat,
+          margin: pdf_widgets.EdgeInsets.zero,
+          build: (ctx) => pdf_widgets.Center(
+            child: pdf_widgets.Image(
+              imageProvider,
+              fit: pdf_widgets.BoxFit.contain,
+              width: pageWidth,
+              height: pageHeight,
+            ),
+          ),
+        ),
+      );
+    }
     return Uint8List.fromList(await pdf.save());
   }
 }

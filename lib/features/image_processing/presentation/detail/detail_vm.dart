@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:codeway_image_processing/base/base_exception.dart';
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
 import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
@@ -11,20 +12,22 @@ import 'package:codeway_image_processing/features/image_processing/domain/entiti
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_model.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
-import 'package:open_filex/open_filex.dart';
 
 /// Detail screen ViewModel. Props passed via [init] from view; all logic uses model.
 class DetailVM {
   DetailVM({
     required IProcessedImageRepository repository,
     required IFileStorageService fileStorageService,
+    required IFileOpenService fileOpenService,
     required INavigationService navigationService,
   }) : _repository = repository,
        _fileStorageService = fileStorageService,
+       _fileOpenService = fileOpenService,
        _navigationService = navigationService;
 
   final IProcessedImageRepository _repository;
   final IFileStorageService _fileStorageService;
+  final IFileOpenService _fileOpenService;
   final INavigationService _navigationService;
   final IToastService _toastService = Get.find<IToastService>();
   final _state = const BaseState<DetailModel>.loading().obs;
@@ -124,7 +127,7 @@ class DetailVM {
       // Silently handle deletion failure - files are already missing,
       // so we proceed to update UI and inform user regardless
     }
-    _toastService.show(AppStrings.fileMissingRemoved);
+    _toastService.show(AppStrings.fileMissingRemoved, type: ToastType.warning);
     _state.value = BaseState.success(model.copyWith(image: null));
     _navigationService.goBack();
   }
@@ -134,21 +137,37 @@ class DetailVM {
     if (entity == null) return;
     try {
       await _deleteEntityAndFiles(entity);
-      _toastService.show(AppStrings.itemDeleted);
+      _toastService.show(AppStrings.itemDeleted, type: ToastType.warning);
       _navigationService.goBack();
     } catch (e) {
-      _toastService.show(AppStrings.failedToDeleteItem);
+      _toastService.show(AppStrings.failedToDeleteItem, type: ToastType.error);
       _navigationService.goBack();
     }
   }
 
   Future<void> openPdf() async {
-    final pdfPath = model.pdfPath;
+    final entity = model.image ?? await _loadEntityForPdf();
+    final pdfPath =
+        model.pdfPath ??
+        (entity != null && entity.processingType.isDocument
+            ? entity.processedPath
+            : null);
     if (pdfPath == null) return;
     try {
-      await OpenFilex.open(pdfPath);
+      await _fileOpenService.open(pdfPath);
     } catch (e) {
-      _toastService.show(AppStrings.fileNotFound);
+      _toastService.show(AppStrings.fileNotFound, type: ToastType.error);
+    }
+  }
+
+  Future<ProcessedImage?> _loadEntityForPdf() async {
+    final id = model.imageId;
+    if (id == null) return null;
+    try {
+      await _repository.init();
+      return await _repository.getById(id);
+    } catch (_) {
+      return null;
     }
   }
 }

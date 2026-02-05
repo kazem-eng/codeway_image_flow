@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:mockito/annotations.dart';
 
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/image_picker_service/i_image_picker_service.dart';
 import 'package:codeway_image_processing/base/services/image_processing_service/i_image_processing_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
@@ -18,6 +19,7 @@ export 'mocks.mocks.dart';
 // Generate mocks with: flutter pub run build_runner build --delete-conflicting-outputs
 @GenerateMocks([
   IFileStorageService,
+  IFileOpenService,
   IImagePickerService,
   IImageProcessingService,
   INavigationService,

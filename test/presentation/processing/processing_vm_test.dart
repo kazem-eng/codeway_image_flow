@@ -108,7 +108,13 @@ void main() {
         ).thenAnswer((_) async => 'test-id');
         when(mockNavigationService.goBack()).thenReturn(null);
         when(
-          mockNavigationService.goTo(
+          mockNavigationService.replaceWith(
+            argThat(isA<String>()),
+            arguments: anyNamed('arguments'),
+          ),
+        ).thenAnswer((_) async => {});
+        when(
+          mockNavigationService.replaceWith(
             anyString,
             arguments: anyNamed('arguments'),
           ),
@@ -185,12 +191,9 @@ void main() {
       test('should process document image successfully', () async {
         // Arrange
         reset(mockProcessingService);
-        reset(mockFileStorageService);
-        reset(mockRepository);
         reset(mockNavigationService);
         final testBytes = TestHelpers.createTestImageBytes();
         final processedImageBytes = Uint8List.fromList([10, 20, 30]);
-        final pdfBytes = Uint8List.fromList([40, 50, 60]);
         createProcessingVM();
         processingVM.init(testBytes);
         when(
@@ -199,27 +202,6 @@ void main() {
         when(
           mockProcessingService.processDocument(testBytes),
         ).thenAnswer((_) async => processedImageBytes);
-        // createPdfFromImage is called with processedImageBytes and a title string
-        when(
-          mockProcessingService.createPdfFromImage(
-            argThat(isA<Uint8List>()),
-            argThat(isA<String>()),
-          ),
-        ).thenAnswer((_) async => pdfBytes);
-        when(
-          mockFileStorageService.saveProcessedImage(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/original.jpg');
-        when(
-          mockFileStorageService.savePdf(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/processed.pdf');
-        when(
-          mockFileStorageService.saveThumbnail(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/thumb.jpg');
-        when(mockRepository.init()).thenAnswer((_) async => {});
-        when(
-          mockRepository.add(anyProcessedImage),
-        ).thenAnswer((_) async => 'test-id');
-        when(mockNavigationService.goBack()).thenReturn(null);
         when(
           mockNavigationService.goTo(
             anyString,
@@ -234,9 +216,9 @@ void main() {
         verify(mockProcessingService.detectContentType(testBytes)).called(1);
         verify(mockProcessingService.processDocument(testBytes)).called(1);
         verify(
-          mockProcessingService.createPdfFromImage(
-            argThat(isA<Uint8List>()),
+          mockNavigationService.replaceWith(
             argThat(isA<String>()),
+            arguments: anyNamed('arguments'),
           ),
         ).called(1);
       });
@@ -263,7 +245,10 @@ void main() {
         // Assert
         expect(processingVM.state.isError, true);
         verify(
-          mockToastService.show(argThat(contains('No faces detected'))),
+          mockToastService.show(
+            argThat(contains('No faces detected')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
         verify(mockNavigationService.goBack()).called(1);
       });
@@ -292,7 +277,10 @@ void main() {
         // Assert
         expect(processingVM.state.isError, true);
         verify(
-          mockToastService.show(argThat(contains('Failed to save'))),
+          mockToastService.show(
+            argThat(contains('Failed to save')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
       });
     });

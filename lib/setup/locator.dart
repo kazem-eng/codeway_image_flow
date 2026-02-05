@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 
 import 'package:codeway_image_processing/base/services/file_storage_service/file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/file_open_service.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/image_picker_service/image_picker_service.dart';
 import 'package:codeway_image_processing/base/services/image_picker_service/i_image_picker_service.dart';
 import 'package:codeway_image_processing/base/services/image_processing_service/image_processing_service.dart';
@@ -17,6 +19,7 @@ import 'package:codeway_image_processing/features/image_processing/data/reposito
 import 'package:codeway_image_processing/features/image_processing/presentation/capture/capture_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/multi_page/multi_page_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/result/result_vm.dart';
 
@@ -28,6 +31,7 @@ void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
     fenix: true,
   );
   Get.lazyPut<IFileStorageService>(() => FileStorageService(), fenix: true);
+  Get.lazyPut<IFileOpenService>(() => FileOpenService(), fenix: true);
   Get.lazyPut<IImageProcessingService>(
     () => ImageProcessingService(),
     fenix: true,
@@ -62,6 +66,7 @@ class VMFactories {
     return HomeVM(
       repository: Get.find<IProcessedImageRepository>(),
       fileStorageService: Get.find<IFileStorageService>(),
+      fileOpenService: Get.find<IFileOpenService>(),
       navigationService: Get.find<INavigationService>(),
       captureVm: createCaptureVM(), // Direct creation, not Get.find
     );
@@ -77,10 +82,23 @@ class VMFactories {
     );
   }
 
+  /// Creates a new MultiPageVM instance with dependencies resolved from GetX.
+  static MultiPageVM createMultiPageVM() {
+    return MultiPageVM(
+      processingService: Get.find<IImageProcessingService>(),
+      imagePickerService: Get.find<IImagePickerService>(),
+      fileOpenService: Get.find<IFileOpenService>(),
+      fileStorageService: Get.find<IFileStorageService>(),
+      repository: Get.find<IProcessedImageRepository>(),
+      navigationService: Get.find<INavigationService>(),
+    );
+  }
+
   /// Creates a new ResultVM instance with dependencies resolved from GetX.
   static ResultVM createResultVM() {
     return ResultVM(
       fileStorageService: Get.find<IFileStorageService>(),
+      fileOpenService: Get.find<IFileOpenService>(),
       navigationService: Get.find<INavigationService>(),
     );
   }
@@ -90,6 +108,7 @@ class VMFactories {
     return DetailVM(
       repository: Get.find<IProcessedImageRepository>(),
       fileStorageService: Get.find<IFileStorageService>(),
+      fileOpenService: Get.find<IFileOpenService>(),
       navigationService: Get.find<INavigationService>(),
     );
   }

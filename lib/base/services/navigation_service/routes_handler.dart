@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_view.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_view.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/multi_page/multi_page_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/multi_page/multi_page_view.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_view.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/result/result_props.dart';
@@ -25,6 +27,15 @@ class RoutesHandler {
         return MaterialPageRoute<void>(
           settings: settings,
           builder: (_) => ProcessingView(imageBytes: props?.imageBytes),
+        );
+      case Routes.multiPage:
+        final props = settings.arguments;
+        if (props is! MultiPageProps) {
+          return _createRedirectRoute(Routes.home);
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => MultiPageView(props: props),
         );
       case Routes.result:
         final resultArgs = settings.arguments;

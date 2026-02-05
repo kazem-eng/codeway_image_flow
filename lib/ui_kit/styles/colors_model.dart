@@ -21,6 +21,7 @@ class ImageFlowColors {
 
   static const Color error = Color(0xFFFF4757);
   static const Color success = Color(0xFF2ECC71);
+  static const Color warning = Color(0xFFF6C453);
 
   static const Color border = Color(0xFF3A3C4F);
   static const Color borderLight = Color(0xFF4A4C62);

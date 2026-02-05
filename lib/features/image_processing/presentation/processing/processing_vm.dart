@@ -13,10 +13,10 @@ import 'package:codeway_image_processing/features/image_processing/data/reposito
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_step.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/multi_page/multi_page_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_model.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/result/result_props.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
-import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
@@ -104,7 +104,7 @@ class ProcessingVM {
     try {
       processed = await _processingService.detectAndProcessFaces(imageBytes);
     } catch (e) {
-      _toastService.show(AppStrings.noFacesDetected);
+      _toastService.show(AppStrings.noFacesDetected, type: ToastType.warning);
       // Preserve model state (original image) for retry
       final currentData = _state.value.data;
       _state.value = BaseState.error(
@@ -138,30 +138,22 @@ class ProcessingVM {
 
     // Process document - will crop if detected, or use full image
     final processedImage = await _processingService.processDocument(imageBytes);
-
-    final data = _state.value.data!;
-    _state.value = BaseState.success(
-      data.copyWith(processingStep: ProcessingStep.creatingPdf, progress: 0.6),
-    );
-
-    final title =
-        '${AppStrings.documentPrefix} ${DateFormats.formatCurrentIsoDate()}';
-    final pdfBytes = await _processingService.createPdfFromImage(
-      processedImage,
-      title,
-    );
-
-    final data2 = _state.value.data!;
-    _state.value = BaseState.success(
-      data2.copyWith(processingStep: ProcessingStep.saving, progress: 0.8),
-    );
-
-    await _saveResult(
+    await _navigateToMultiPageBuilder(
       originalBytes: imageBytes,
-      processedBytes: pdfBytes,
-      type: ProcessingType.document,
-      isPdf: true,
-      documentTitle: title,
+      processedBytes: processedImage,
+    );
+  }
+
+  Future<void> _navigateToMultiPageBuilder({
+    required Uint8List originalBytes,
+    required Uint8List processedBytes,
+  }) async {
+    await _navigationService.replaceWith(
+      Routes.multiPage,
+      arguments: MultiPageProps(
+        originalBytes: originalBytes,
+        processedBytes: processedBytes,
+      ),
     );
   }
 
@@ -303,12 +295,7 @@ class ProcessingVM {
 
   /// Navigates to the result screen via home to ensure proper navigation context.
   Future<void> _navigateToResultViaHome(ProcessedImage entity) async {
-    // Go back to home screen first
-    _navigationService.goBack();
-    // Small delay to ensure home screen is ready and rendered
-    await Future.delayed(const Duration(milliseconds: 200));
-    // Then navigate to result screen from home
-    await _navigationService.goTo(
+    await _navigationService.replaceWith(
       Routes.result,
       arguments: ResultProps(processedImage: entity),
     );
@@ -319,7 +306,7 @@ class ProcessingVM {
     _state.value = BaseState.error(
       exception: StorageException(message: error.toString()),
     );
-    _toastService.show(AppStrings.failedToSaveImagePdf);
+    _toastService.show(AppStrings.failedToSaveImagePdf, type: ToastType.error);
   }
 }
 

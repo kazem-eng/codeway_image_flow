@@ -39,7 +39,7 @@ class CaptureVM {
       await selectSource(ImageSource.camera);
       await captureImage();
     } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage);
+      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
     }
   }
 
@@ -48,7 +48,7 @@ class CaptureVM {
       await selectSource(ImageSource.gallery);
       await pickFromGallery();
     } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage);
+      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
     }
   }
 

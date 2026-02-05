@@ -66,11 +66,21 @@ class AppStrings {
       'Failed to load images. Please try again.';
   static const String failedToCaptureImage =
       'Failed to capture image. Please try again.';
+  static const String atLeastOnePage = 'At least one page is required.';
+  static const String multiPageDocumentsOnly =
+      'Multi-page PDFs support documents only.';
+  static const String pageAdded = 'Page added.';
 
   // PDF Labels
   static const String pdf = 'PDF';
   static const String openPdf = 'Open PDF';
   static const String pdfDocument = 'PDF Document';
+  static const String exportPdf = 'Export PDF';
+  static const String addPage = 'Add Page';
+  static const String pagesLabel = 'Pages';
+  static const String pageLabel = 'Page';
+  static const String page = 'page';
+  static const String pages = 'pages';
 
   // Image Labels
   static const String filtered = 'Filtered';

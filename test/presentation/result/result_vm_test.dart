@@ -16,12 +16,14 @@ dynamic anyString = any;
 void main() {
   late ResultVM resultVM;
   late MockIFileStorageService mockFileStorageService;
+  late MockIFileOpenService mockFileOpenService;
   late MockINavigationService mockNavigationService;
   late MockIToastService mockToastService;
 
   void createResultVM() {
     resultVM = ResultVM(
       fileStorageService: mockFileStorageService,
+      fileOpenService: mockFileOpenService,
       navigationService: mockNavigationService,
     );
   }
@@ -30,6 +32,7 @@ void main() {
     Get.testMode = true;
     Get.reset();
     mockFileStorageService = MockIFileStorageService();
+    mockFileOpenService = MockIFileOpenService();
     mockNavigationService = MockINavigationService();
     mockToastService = MockIToastService();
 
@@ -174,7 +177,10 @@ void main() {
         expect(resultVM.state.isError, true);
         expect(resultVM.state.exception, isA<StorageException>());
         verify(
-          mockToastService.show(argThat(contains('Failed to load'))),
+          mockToastService.show(
+            argThat(contains('Failed to load')),
+            type: anyNamed('type'),
+          ),
         ).called(greaterThanOrEqualTo(1));
       });
 
@@ -217,7 +223,10 @@ void main() {
         // Assert
         verify(mockNavigationService.goBackUntil(Routes.home)).called(1);
         verify(
-          mockToastService.show(argThat(contains('successfully'))),
+          mockToastService.show(
+            argThat(contains('successfully')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
       });
 
@@ -242,7 +251,12 @@ void main() {
 
         // Assert
         verify(mockNavigationService.goBackUntil(Routes.home)).called(1);
-        verifyNever(mockToastService.show(argThat(contains('successfully'))));
+        verifyNever(
+          mockToastService.show(
+            argThat(contains('successfully')),
+            type: anyNamed('type'),
+          ),
+        );
       });
     });
 
@@ -250,6 +264,7 @@ void main() {
       test('should open PDF when path exists', () async {
         // Arrange
         reset(mockFileStorageService);
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           type: ProcessingType.document,
         );
@@ -260,6 +275,7 @@ void main() {
         when(
           mockFileStorageService.loadPdfBytes(anyString),
         ).thenAnswer((_) async => testBytes);
+        when(mockFileOpenService.open(anyString)).thenAnswer((_) async => {});
         createResultVM();
         await resultVM.init(testImage);
         await resultVM.loadImages();
@@ -267,13 +283,14 @@ void main() {
         // Act
         await resultVM.openPdf();
 
-        // Note: OpenFilex.open is hard to mock, so we just verify it doesn't throw
-        // In a real scenario, you'd wrap OpenFilex in a service and mock that
+        // Assert
+        verify(mockFileOpenService.open(argThat(isA<String>()))).called(1);
       });
 
       test('should return early if path is null', () async {
         // Arrange
         reset(mockFileStorageService);
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           type: ProcessingType.face,
         );
@@ -289,6 +306,7 @@ void main() {
         await resultVM.openPdf();
 
         // Assert - should return early without error
+        verifyNever(mockFileOpenService.open(argThat(isA<String>())));
       });
     });
   });

@@ -1,5 +1,6 @@
 import 'package:codeway_image_processing/base/base_exception.dart';
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
+import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
@@ -8,17 +9,19 @@ import 'package:codeway_image_processing/features/image_processing/domain/entiti
 import 'package:codeway_image_processing/features/image_processing/presentation/result/result_model.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
-import 'package:open_filex/open_filex.dart';
 
 /// Result screen ViewModel. Props passed via [init] from view; all logic uses model.
 class ResultVM {
   ResultVM({
     required IFileStorageService fileStorageService,
+    required IFileOpenService fileOpenService,
     required INavigationService navigationService,
   }) : _fileStorageService = fileStorageService,
+       _fileOpenService = fileOpenService,
        _navigationService = navigationService;
 
   final IFileStorageService _fileStorageService;
+  final IFileOpenService _fileOpenService;
   final INavigationService _navigationService;
   final IToastService _toastService = Get.find<IToastService>();
   final _state = const BaseState<ResultModel>.loading().obs;
@@ -64,7 +67,7 @@ class ResultVM {
         ),
       );
     } catch (e) {
-      _toastService.show(AppStrings.failedToLoadImages);
+      _toastService.show(AppStrings.failedToLoadImages, type: ToastType.error);
       _state.value = BaseState.error(
         exception: StorageException(message: e.toString()),
         data: model,
@@ -76,17 +79,25 @@ class ResultVM {
     final showSuccessToast = _state.value.isSuccess;
     await _navigationService.goBackUntil(Routes.home);
     if (showSuccessToast) {
-      _toastService.show(AppStrings.imageProcessedSuccessfully);
+      _toastService.show(
+        AppStrings.imageProcessedSuccessfully,
+        type: ToastType.success,
+      );
     }
   }
 
   Future<void> openPdf() async {
-    final path = model.processedImage?.processedPath;
+    final entity = model.processedImage;
+    final path =
+        model.pdfPath ??
+        (entity != null && entity.processingType.isDocument
+            ? entity.processedPath
+            : null);
     if (path == null) return;
     try {
-      await OpenFilex.open(path);
+      await _fileOpenService.open(path);
     } catch (e) {
-      _toastService.show(AppStrings.fileNotFound);
+      _toastService.show(AppStrings.fileNotFound, type: ToastType.error);
     }
   }
 }

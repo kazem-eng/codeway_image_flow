@@ -18,6 +18,7 @@ void main() {
   late HomeVM homeVM;
   late MockIProcessedImageRepository mockRepository;
   late MockIFileStorageService mockFileStorageService;
+  late MockIFileOpenService mockFileOpenService;
   late MockINavigationService mockNavigationService;
   late MockCaptureVM mockCaptureVM;
   late MockIToastService mockToastService;
@@ -27,6 +28,7 @@ void main() {
     Get.reset();
     mockRepository = MockIProcessedImageRepository();
     mockFileStorageService = MockIFileStorageService();
+    mockFileOpenService = MockIFileOpenService();
     mockNavigationService = MockINavigationService();
     mockCaptureVM = MockCaptureVM();
     mockToastService = MockIToastService();
@@ -38,6 +40,7 @@ void main() {
     homeVM = HomeVM(
       repository: mockRepository,
       fileStorageService: mockFileStorageService,
+      fileOpenService: mockFileOpenService,
       navigationService: mockNavigationService,
       captureVm: mockCaptureVM,
     );
@@ -114,7 +117,9 @@ void main() {
           mockFileStorageService.deleteProcessedImageFiles(testImage),
         ).called(1);
         verify(mockRepository.delete('test-id')).called(1);
-        verify(mockToastService.show(anyString)).called(1);
+        verify(
+          mockToastService.show(anyString, type: anyNamed('type')),
+        ).called(1);
       });
 
       test('should handle error when deletion fails', () async {
@@ -137,7 +142,10 @@ void main() {
 
         // Assert
         verify(
-          mockToastService.show(argThat(contains('Failed to delete'))),
+          mockToastService.show(
+            argThat(contains('Failed to delete')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
         verifyNever(mockRepository.delete(anyString));
       });
@@ -196,7 +204,10 @@ void main() {
 
         // Assert
         verify(
-          mockToastService.show(argThat(contains('Failed to capture'))),
+          mockToastService.show(
+            argThat(contains('Failed to capture')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
         verifyNever(mockRepository.getAll());
       });
@@ -235,7 +246,10 @@ void main() {
 
         // Assert
         verify(
-          mockToastService.show(argThat(contains('Failed to capture'))),
+          mockToastService.show(
+            argThat(contains('Failed to capture')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
         verifyNever(mockRepository.getAll());
       });
@@ -270,27 +284,33 @@ void main() {
     group('openPdf', () {
       test('should open PDF for document type', () async {
         // Arrange
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           type: ProcessingType.document,
         );
+        when(mockFileOpenService.open(anyString)).thenAnswer((_) async => {});
+        createHomeVM();
 
         // Act
         await homeVM.openPdf(testImage);
 
-        // Note: OpenFilex.open is hard to mock, so we just verify it doesn't throw
-        // In a real scenario, you'd wrap OpenFilex in a service and mock that
+        // Assert
+        verify(mockFileOpenService.open(argThat(isA<String>()))).called(1);
       });
 
       test('should not open PDF for face type', () async {
         // Arrange
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           type: ProcessingType.face,
         );
+        createHomeVM();
 
         // Act
         await homeVM.openPdf(testImage);
 
         // Assert - should return early without opening
+        verifyNever(mockFileOpenService.open(argThat(isA<String>())));
       });
     });
   });

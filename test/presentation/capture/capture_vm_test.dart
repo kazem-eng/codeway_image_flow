@@ -109,7 +109,10 @@ void main() {
 
         // Assert
         verify(
-          mockToastService.show(argThat(contains('Failed to capture'))),
+          mockToastService.show(
+            argThat(contains('Failed to capture')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
       });
     });
@@ -169,7 +172,10 @@ void main() {
 
         // Assert
         verify(
-          mockToastService.show(argThat(contains('Failed to capture'))),
+          mockToastService.show(
+            argThat(contains('Failed to capture')),
+            type: anyNamed('type'),
+          ),
         ).called(1);
       });
     });
