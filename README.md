@@ -6,13 +6,12 @@ A Flutter application for image processing and analysis using Google ML Kit. The
 
 Short recordings from key flows in the app.
 
-<video src="docs/videos/feature_01.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_02.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_03.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_04.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_05.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_06.mp4" controls muted playsinline width="320"></video>
-<video src="docs/videos/feature_07.mp4" controls muted playsinline width="320"></video>
+- [Feature video 1](https://drive.google.com/file/d/13WfJmpz85Yzp8nDg0RPsfTSIG8DytBm7/view?usp=drive_link)
+- [Feature video 2](https://drive.google.com/file/d/1rG6LqEZJ1EXoMoAgTo-p2K54Az_WtfNO/view?usp=drive_link)
+- [Feature video 3](https://drive.google.com/file/d/1PF56AfUd_ue474D6QeqFrlad_mptoPG-/view?usp=drive_link)
+- [Feature video 4](https://drive.google.com/file/d/1rDVcQK1fHGSUp4aeCeWA1jUzW-WkNcSr/view?usp=drive_link)
+- [Feature video 5](https://drive.google.com/file/d/1-P100vNHnls53xgtTE3aaxuvcbil2RWw/view?usp=drive_link)
+- [Feature video 6](https://drive.google.com/file/d/1DD7wa2TVCHkCDzvueHR9qZbumiVYAmdS/view?usp=drive_link)
 
 ## 📋 Table of Contents
 
