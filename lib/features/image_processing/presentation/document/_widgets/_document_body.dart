@@ -3,10 +3,12 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:codeway_image_processing/base/mvvm_base/base_vm.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/document/document_model.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/_widgets/_document_action_row.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/_widgets/_document_page_list.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/_widgets/_document_preview_card.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/_widgets/_document_section_header.dart';
 import 'package:codeway_image_processing/ui_kit/components/dialog_helpers.dart';
-import 'package:codeway_image_processing/ui_kit/components/imageflow_button.dart';
 import 'package:codeway_image_processing/ui_kit/components/imageflow_loader.dart';
 import 'package:codeway_image_processing/ui_kit/components/source_choice_dialog.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
@@ -62,49 +64,35 @@ class DocumentBody extends StatelessWidget {
         child: Stack(
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                ImageFlowSpacing.md,
-                ImageFlowSpacing.md,
-                ImageFlowSpacing.md,
-                ImageFlowSpacing.lg,
-              ),
+              padding: ImageFlowSpacing.pagePadding,
               child: isLandscape
                   ? Row(
                       children: [
                         Expanded(
                           flex: 5,
-                          child: _PreviewCard(page: selectedPage),
+                          child: DocumentPreviewCard(page: selectedPage),
                         ),
                         SizedBox(width: ImageFlowSpacing.md),
                         Expanded(
                           flex: 4,
                           child: Column(
                             children: [
-                              _SectionHeader(
+                              DocumentSectionHeader(
                                 title:
                                     '${AppStrings.pagesLabel} (${pages.length})',
                               ),
                               SizedBox(height: ImageFlowSpacing.sm),
                               Expanded(
-                                child: ReorderableListView.builder(
-                                  buildDefaultDragHandles: false,
+                                child: DocumentPageList(
+                                  pages: pages,
+                                  selectedIndex: selectedIndex,
+                                  onSelect: vm.selectPage,
+                                  onRemove: vm.removePage,
                                   onReorder: vm.reorderPages,
-                                  itemCount: pages.length,
-                                  itemBuilder: (context, index) {
-                                    final page = pages[index];
-                                    return _PageTile(
-                                      key: ValueKey(page.id),
-                                      index: index,
-                                      page: page,
-                                      isSelected: index == selectedIndex,
-                                      onSelect: () => vm.selectPage(index),
-                                      onRemove: () => vm.removePage(index),
-                                    );
-                                  },
                                 ),
                               ),
                               SizedBox(height: ImageFlowSpacing.md),
-                              _ActionRow(
+                              DocumentActionRow(
                                 isBusy: isBusy,
                                 onAddPage: () =>
                                     _showSourceDialog(context, vm),
@@ -118,36 +106,27 @@ class DocumentBody extends StatelessWidget {
                     )
                   : Column(
                       children: [
-                        _PreviewCard(
+                        DocumentPreviewCard(
                           page: selectedPage,
                           height: ImageFlowSizes.documentPreviewHeight,
                         ),
                         SizedBox(height: ImageFlowSpacing.lg),
-                        _SectionHeader(
+                        DocumentSectionHeader(
                           title:
                               '${AppStrings.pagesLabel} (${pages.length})',
                         ),
                         SizedBox(height: ImageFlowSpacing.sm),
                         Expanded(
-                          child: ReorderableListView.builder(
-                            buildDefaultDragHandles: false,
+                          child: DocumentPageList(
+                            pages: pages,
+                            selectedIndex: selectedIndex,
+                            onSelect: vm.selectPage,
+                            onRemove: vm.removePage,
                             onReorder: vm.reorderPages,
-                            itemCount: pages.length,
-                            itemBuilder: (context, index) {
-                              final page = pages[index];
-                              return _PageTile(
-                                key: ValueKey(page.id),
-                                index: index,
-                                page: page,
-                                isSelected: index == selectedIndex,
-                                onSelect: () => vm.selectPage(index),
-                                onRemove: () => vm.removePage(index),
-                              );
-                            },
                           ),
                         ),
                         SizedBox(height: ImageFlowSpacing.md),
-                        _ActionRow(
+                        DocumentActionRow(
                           isBusy: isBusy,
                           onAddPage: () => _showSourceDialog(context, vm),
                           onExport: vm.exportPdf,
@@ -169,160 +148,5 @@ class DocumentBody extends StatelessWidget {
         ),
       );
     });
-  }
-}
-
-class _PreviewCard extends StatelessWidget {
-  const _PreviewCard({required this.page, this.height});
-
-  final DocumentPage page;
-  final double? height;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      width: double.infinity,
-      padding: const EdgeInsets.all(ImageFlowSizes.cardInnerPadding),
-      decoration: ImageFlowDecorations.card(),
-      child: ClipRRect(
-        borderRadius: ImageFlowShapes.roundedMedium(),
-        child: Image.memory(page.processedBytes, fit: BoxFit.contain),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(title, style: ImageFlowTextStyles.bodyLarge),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
-    required this.isBusy,
-    required this.onAddPage,
-    required this.onExport,
-    required this.isSaving,
-  });
-
-  final bool isBusy;
-  final VoidCallback onAddPage;
-  final Future<void> Function() onExport;
-  final bool isSaving;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: isBusy ? null : onAddPage,
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(
-                color: ImageFlowColors.primaryStart,
-              ),
-              foregroundColor: ImageFlowColors.textPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: ImageFlowShapes.roundedMedium(),
-              ),
-              minimumSize: const Size.fromHeight(
-                ImageFlowSizes.buttonHeight,
-              ),
-            ),
-            child: Text(AppStrings.addPage),
-          ),
-        ),
-        SizedBox(width: ImageFlowSpacing.md),
-        Expanded(
-          child: ImageFlowButton(
-            label: AppStrings.savePdf,
-            onPressed: isBusy ? null : onExport,
-            isLoading: isSaving,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PageTile extends StatelessWidget {
-  const _PageTile({
-    super.key,
-    required this.index,
-    required this.page,
-    required this.isSelected,
-    required this.onSelect,
-    required this.onRemove,
-  });
-
-  final int index;
-  final DocumentPage page;
-  final bool isSelected;
-  final VoidCallback onSelect;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: ImageFlowSpacing.sm),
-      decoration: ImageFlowDecorations.card(
-        border: Border.all(
-          color: isSelected
-              ? ImageFlowColors.primaryStart
-              : ImageFlowColors.border,
-        ),
-      ),
-      child: InkWell(
-        onTap: onSelect,
-        borderRadius: ImageFlowShapes.roundedMedium(),
-        child: Padding(
-          padding: const EdgeInsets.all(ImageFlowSpacing.sm),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: ImageFlowShapes.roundedSmall(),
-                child: Image.memory(
-                  page.processedBytes,
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              SizedBox(width: ImageFlowSpacing.sm),
-              Expanded(
-                child: Text(
-                  '${AppStrings.pageLabel} ${index + 1}',
-                  style: ImageFlowTextStyles.bodyMedium,
-                ),
-              ),
-              IconButton(
-                onPressed: onRemove,
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: ImageFlowColors.textSecondary,
-                ),
-              ),
-              ReorderableDragStartListener(
-                index: index,
-                child: const Icon(
-                  Icons.drag_handle,
-                  color: ImageFlowColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

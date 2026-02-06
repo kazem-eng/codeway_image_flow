@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../styles/colors_model.dart';
 import '../styles/theme_data.dart';
-
-/// Visual styles for ImageFlow toast.
-enum ImageFlowToastStyle { info, success, warning, error }
+import 'imageflow_toast_style.dart';
 
 /// Animated toast widget shown in an overlay.
 class ImageFlowToast extends StatefulWidget {
@@ -30,12 +28,14 @@ class _ImageFlowToastState extends State<ImageFlowToast>
   late final AnimationController _controller;
   late final Animation<double> _opacity;
   late final Animation<Offset> _offset;
+  late final ImageFlowToastStyleConfig _styleConfig;
   Timer? _timer;
   bool _dismissed = false;
 
   @override
   void initState() {
     super.initState();
+    _styleConfig = ImageFlowToastStyleConfig.fromStyle(widget.style);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
@@ -57,7 +57,7 @@ class _ImageFlowToastState extends State<ImageFlowToast>
       ),
     );
     _controller.forward();
-    _timer = Timer(_durationFor(widget.style), _dismiss);
+    _timer = Timer(_styleConfig.duration, _dismiss);
   }
 
   @override
@@ -65,19 +65,6 @@ class _ImageFlowToastState extends State<ImageFlowToast>
     _timer?.cancel();
     _controller.dispose();
     super.dispose();
-  }
-
-  Duration _durationFor(ImageFlowToastStyle style) {
-    switch (style) {
-      case ImageFlowToastStyle.error:
-        return const Duration(milliseconds: 2600);
-      case ImageFlowToastStyle.warning:
-        return const Duration(milliseconds: 2200);
-      case ImageFlowToastStyle.success:
-        return const Duration(milliseconds: 1800);
-      case ImageFlowToastStyle.info:
-        return const Duration(milliseconds: 2000);
-    }
   }
 
   void _dismiss() {
@@ -88,8 +75,8 @@ class _ImageFlowToastState extends State<ImageFlowToast>
 
   @override
   Widget build(BuildContext context) {
-    final accent = _accentColor(widget.style);
-    final icon = _iconFor(widget.style);
+    final accent = _styleConfig.accent;
+    final icon = _styleConfig.icon;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Positioned(
@@ -161,29 +148,4 @@ class _ImageFlowToastState extends State<ImageFlowToast>
     );
   }
 
-  Color _accentColor(ImageFlowToastStyle style) {
-    switch (style) {
-      case ImageFlowToastStyle.success:
-        return ImageFlowColors.success;
-      case ImageFlowToastStyle.warning:
-        return ImageFlowColors.warning;
-      case ImageFlowToastStyle.error:
-        return ImageFlowColors.error;
-      case ImageFlowToastStyle.info:
-        return ImageFlowColors.accentPurple;
-    }
-  }
-
-  IconData _iconFor(ImageFlowToastStyle style) {
-    switch (style) {
-      case ImageFlowToastStyle.success:
-        return Icons.check;
-      case ImageFlowToastStyle.warning:
-        return Icons.info_outline;
-      case ImageFlowToastStyle.error:
-        return Icons.error_outline;
-      case ImageFlowToastStyle.info:
-        return Icons.notifications_none;
-    }
-  }
 }

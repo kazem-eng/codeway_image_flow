@@ -5,8 +5,6 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/ui_kit/components/dialog_helpers.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/theme_data.dart';
-import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -25,8 +23,8 @@ class HomeSuccessContent extends StatelessWidget {
 
     return Obx(() {
       final vm = BaseViewModel.of<HomeVM>();
-      final history = vm.model.history;
-      if (history.isEmpty) return const EmptyState();
+      final items = vm.model.items;
+      if (items.isEmpty) return const EmptyState();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -49,25 +47,17 @@ class HomeSuccessContent extends StatelessWidget {
                 top: ImageFlowSpacing.sm,
                 bottom: 80,
               ),
-              itemCount: history.length,
+              itemCount: items.length,
               itemBuilder: (context, index) {
-                final image = history[index];
-                final dateStr = DateFormats.formatDateWithTime(image.createdAt);
+                final item = items[index];
+                final image = item.image;
                 final isFace = image.processingType.isFace;
                 final isFaceBatch = image.processingType.isFaceBatch;
-                final batchCount = FaceBatchMetadata.parseGroup(
-                  image.metadata,
-                ).length;
-                final title = isFaceBatch
-                    ? '${AppStrings.facesLabel} ($batchCount)'
-                    : (isFace
-                          ? AppStrings.faceResultScreenTitle
-                          : (image.metadata ?? AppStrings.pdfDocument));
                 return HistoryItem(
                   image: image,
                   thumbnailBytes: null,
-                  title: title,
-                  subtitle: dateStr,
+                  title: item.title,
+                  subtitle: item.subtitle,
                   onTap: () => isFaceBatch
                       ? vm.openFaceGroup(image)
                       : (isFace

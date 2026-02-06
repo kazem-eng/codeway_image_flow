@@ -36,6 +36,7 @@ class NativeImageProcessing {
     fun handle(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "processDocument" -> {
+                // Raw bytes in, processed JPEG bytes out.
                 val bytes = call.arguments as? ByteArray
                 if (bytes == null) {
                     result.error("invalid_args", "Expected raw image bytes", null)
@@ -54,6 +55,7 @@ class NativeImageProcessing {
             }
 
             "createPdfFromImage" -> {
+                // Build a single-page PDF with the supplied title.
                 val args = call.arguments as? Map<*, *>
                 val bytes = args?.get("bytes") as? ByteArray
                 val title = args?.get("title") as? String
@@ -85,6 +87,7 @@ class NativeImageProcessing {
 
     private fun loadNormalizedBitmap(bytes: ByteArray): Bitmap? {
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        // Apply EXIF orientation so downstream detection works correctly.
         val oriented = applyExifOrientation(bytes, bitmap)
         return oriented.copy(Bitmap.Config.ARGB_8888, true)
     }
@@ -121,6 +124,7 @@ class NativeImageProcessing {
 
     private fun processDocumentData(bytes: ByteArray): ByteArray {
         val bitmap = loadNormalizedBitmap(bytes) ?: return bytes
+        // Normalize orientation then run the document pipeline.
         val processed = processDocumentBitmap(bitmap)
         val stream = ByteArrayOutputStream()
         processed.compress(Bitmap.CompressFormat.JPEG, 92, stream)
@@ -128,15 +132,20 @@ class NativeImageProcessing {
     }
 
     private fun processDocumentBitmap(bitmap: Bitmap): Bitmap {
+        // Text blocks guide cropping when edge detection fails.
         val textBlocks = runCatching { detectTextBlocks(bitmap) }.getOrDefault(emptyList())
         val textBounds = computeTextBoundsRect(textBlocks, bitmap.width, bitmap.height)
+        // OpenCV edge detection attempts perspective correction.
         val corners = detectDocumentCornersOpenCV(bitmap, textBounds)
         val candidate = corners?.let { warpPerspectiveOpenCV(bitmap, it) }
+        // Fallback to text bounds crop if no reliable corners.
         val fallback = candidate ?: textBounds?.let { cropBitmap(bitmap, it) } ?: bitmap
+        // Increase contrast and reduce saturation for readability.
         return enhanceContrast(fallback)
     }
 
     private fun detectTextBlocks(bitmap: Bitmap): List<android.graphics.Rect> {
+        // ML Kit text recognition (blocking) to locate text bounds.
         val image = InputImage.fromBitmap(bitmap, 0)
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val result = Tasks.await(recognizer.process(image))
@@ -157,6 +166,7 @@ class NativeImageProcessing {
     )
 
     private fun resizeForDetection(bitmap: Bitmap): DetectionBitmap? {
+        // Downscale for detection speed; track scale to map back.
         val maxDimension = max(bitmap.width, bitmap.height)
         if (maxDimension <= detectionMaxDimension) return null
         val scale = detectionMaxDimension.toFloat() / maxDimension.toFloat()
@@ -173,6 +183,7 @@ class NativeImageProcessing {
         textRect: Rect?
     ): CornerPoints? {
         if (!openCvReady) return null
+        // Work on a downscaled bitmap for performance.
         val detection = resizeForDetection(bitmap)
         val source = detection?.bitmap ?: bitmap
         val scaleX = detection?.scaleX ?: 1f
@@ -204,6 +215,7 @@ class NativeImageProcessing {
                 )
             }
 
+            // Prefer quads that contain the detected text center.
             bestQuad = findBestQuad(contours, minArea, textCenter)
 
             if (bestQuad == null) {
@@ -227,6 +239,7 @@ class NativeImageProcessing {
                         Imgproc.RETR_LIST,
                         Imgproc.CHAIN_APPROX_SIMPLE
                     )
+                    // Fallback with adaptive thresholding if edges fail.
                     bestQuad = findBestQuad(altContours, minArea, textCenter)
                 } finally {
                     threshold.release()
@@ -250,6 +263,7 @@ class NativeImageProcessing {
         minArea: Double,
         textCenter: CvPoint?
     ): MatOfPoint2f? {
+        // Find the largest convex quad; optionally keep text center inside.
         var best: MatOfPoint2f? = null
         var bestArea = 0.0
 
@@ -302,6 +316,7 @@ class NativeImageProcessing {
 
         var bestFallback: MatOfPoint2f? = null
         var bestFallbackArea = 0.0
+        // Fallback to minAreaRect quads if no 4-point approximation passes.
         for (contour in contours) {
             val area = abs(Imgproc.contourArea(contour))
             if (area < minArea * 0.5) continue
@@ -329,6 +344,7 @@ class NativeImageProcessing {
         scaleX: Float,
         scaleY: Float
     ): CornerPoints? {
+        // Map scaled points back to original coordinates and order them.
         val points = quad.toArray()
         if (points.size != 4) return null
         val scaled = points.map { PointF((it.x * scaleX).toFloat(), (it.y * scaleY).toFloat()) }
@@ -336,6 +352,7 @@ class NativeImageProcessing {
     }
 
     private fun orderCorners(points: List<PointF>): CornerPoints {
+        // Order corners using coordinate sums/differences.
         val topLeft = points.minByOrNull { it.x + it.y } ?: points.first()
         val bottomRight = points.maxByOrNull { it.x + it.y } ?: points.last()
         val topRight = points.maxByOrNull { it.x - it.y } ?: points.first()
@@ -345,6 +362,7 @@ class NativeImageProcessing {
 
     private fun warpPerspectiveOpenCV(bitmap: Bitmap, corners: CornerPoints): Bitmap? {
         if (!openCvReady) return null
+        // Compute the target rectangle size from corner distances.
         val widthA = distance(corners.bottomRight, corners.bottomLeft)
         val widthB = distance(corners.topRight, corners.topLeft)
         val maxWidth = max(widthA, widthB).roundToInt().coerceAtLeast(1)
@@ -370,6 +388,7 @@ class NativeImageProcessing {
         val warped = Mat()
         val transform = Imgproc.getPerspectiveTransform(src, dst)
         return try {
+            // Warp into a fronto-parallel rectangle.
             Utils.bitmapToMat(bitmap, srcMat)
             Imgproc.warpPerspective(
                 srcMat,
@@ -398,6 +417,7 @@ class NativeImageProcessing {
     }
 
     private fun cropBitmap(bitmap: Bitmap, rect: Rect): Bitmap? {
+        // Clamp crop to bitmap bounds.
         val left = rect.left.coerceAtLeast(0)
         val top = rect.top.coerceAtLeast(0)
         val right = rect.right.coerceAtMost(bitmap.width)
@@ -413,6 +433,7 @@ class NativeImageProcessing {
         imageWidth: Int,
         imageHeight: Int
     ): Rect? {
+        // Union all text blocks and add a small padding.
         if (blocks.isEmpty()) return null
         var minX = Int.MAX_VALUE
         var minY = Int.MAX_VALUE
@@ -439,6 +460,7 @@ class NativeImageProcessing {
     }
 
     private fun enhanceContrast(bitmap: Bitmap): Bitmap {
+        // Convert to grayscale and boost contrast/brightness.
         val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -464,6 +486,7 @@ class NativeImageProcessing {
     }
 
     private fun createPdfData(bitmap: Bitmap, title: String): ByteArray {
+        // Render to A4 and center-fit by aspect ratio.
         val pageWidth = 595
         val pageHeight = 842
         val document = PdfDocument()

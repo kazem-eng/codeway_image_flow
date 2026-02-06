@@ -70,7 +70,7 @@ void main() {
 
         // Assert
         expect(homeVM.state.isSuccess, true);
-        expect(homeVM.model.history.length, 2);
+        expect(homeVM.model.items.length, 2);
         verify(mockRepository.init()).called(1);
         verify(mockRepository.getAll()).called(1);
       });

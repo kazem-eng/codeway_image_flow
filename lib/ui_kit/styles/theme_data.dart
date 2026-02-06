@@ -118,6 +118,12 @@ class ImageFlowSpacing {
 
   static const EdgeInsets screenPadding = EdgeInsets.all(32.0);
   static const EdgeInsets cardPadding = EdgeInsets.all(16.0);
+  static const EdgeInsets pagePadding = EdgeInsets.fromLTRB(
+    md,
+    md,
+    md,
+    lg,
+  );
 
   static const double borderRadiusSmall = 8.0;
   static const double borderRadiusMedium = 12.0;

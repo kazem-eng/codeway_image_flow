@@ -13,10 +13,14 @@ test/
 │   │   └── source_selector_dialog_vm_test.dart
 │   ├── detail/
 │   │   └── detail_vm_test.dart
+│   ├── document/
+│   │   └── document_vm_test.dart
 │   ├── home/
 │   │   └── home_vm_test.dart
 │   ├── processing/
 │   │   └── processing_vm_test.dart
+│   ├── summary/
+│   │   └── summary_vm_test.dart
 ├── services/                         # Service tests
 │   ├── image_picker_service_test.dart
 │   ├── image_processing_service_test.dart
@@ -56,6 +60,8 @@ open coverage/html/index.html
 - ✅ **SourceSelectorDialogVM**: Image capture from camera/gallery, source selection
 - ✅ **ProcessingVM**: Image processing flow, face/document detection, saving
 - ✅ **DetailVM**: Image loading, deletion, PDF opening
+- ✅ **DocumentVM**: Document page management and PDF export
+- ✅ **SummaryVM**: Summary loading and face management
 
 ### Services (Unit Tests)
 - ✅ **NavigationService**: Null-safety and basic navigation methods

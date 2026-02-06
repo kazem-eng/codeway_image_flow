@@ -33,12 +33,7 @@ class ProcessingBody extends StatelessWidget {
       final stepText = model.processingStep.displayText;
 
       return Padding(
-        padding: EdgeInsets.fromLTRB(
-          ImageFlowSpacing.md,
-          ImageFlowSpacing.md,
-          ImageFlowSpacing.md,
-          ImageFlowSpacing.lg,
-        ),
+        padding: ImageFlowSpacing.pagePadding,
         child: Column(
           children: [
             ProcessingProgressCard(

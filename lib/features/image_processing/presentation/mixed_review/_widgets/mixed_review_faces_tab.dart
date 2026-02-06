@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:codeway_image_processing/base/mvvm_base/base.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/_widgets/summary_face_preview_section.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/_widgets/summary_face_thumbnail_strip.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_vm.dart';
 import 'package:codeway_image_processing/setup/locator.dart';
@@ -12,7 +13,7 @@ import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
 /// Faces tab for mixed review.
-class MixedReviewFacesTab extends StatelessWidget {
+class MixedReviewFacesTab extends StatefulWidget {
   const MixedReviewFacesTab({
     super.key,
     required this.faces,
@@ -25,16 +26,26 @@ class MixedReviewFacesTab extends StatelessWidget {
   final ProcessedImage? faceGroupEntity;
 
   @override
+  State<MixedReviewFacesTab> createState() => _MixedReviewFacesTabState();
+}
+
+class _MixedReviewFacesTabState extends State<MixedReviewFacesTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return BaseView<SummaryVM>(
       vmFactory: () => VMFactories.createSummaryVM(closeOnEmpty: false),
       initViewModel: (vm) async {
         await vm.init(
           SummaryProps(
-            faces: faces,
+            faces: widget.faces,
             documents: const [],
-            faceGroupId: faceGroupId,
-            faceGroupEntity: faceGroupEntity,
+            faceGroupId: widget.faceGroupId,
+            faceGroupEntity: widget.faceGroupEntity,
           ),
         );
       },
@@ -53,18 +64,37 @@ class MixedReviewFacesTab extends StatelessWidget {
               ),
             );
           }
-          return ListView(
-            padding: EdgeInsets.fromLTRB(
-              ImageFlowSpacing.md,
-              ImageFlowSpacing.md,
-              ImageFlowSpacing.md,
-              ImageFlowSpacing.lg,
-            ),
+          final faceIndex =
+              model.selectedFaceIndex.clamp(0, model.faces.length - 1);
+          return Column(
             children: [
-              SummaryFacePreviewSection(
-                model: model,
-                onSelect: viewModel.selectFace,
-                onDeleteAt: viewModel.deleteFaceAt,
+              Expanded(
+                child: ListView(
+                  padding: ImageFlowSpacing.pagePadding,
+                  children: [
+                    SummaryFacePreviewSection(
+                      model: model,
+                      onSelect: viewModel.selectFace,
+                      onDeleteAt: viewModel.deleteFaceAt,
+                      onOpenDetail: viewModel.openDetail,
+                      showThumbnails: false,
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  ImageFlowSpacing.md,
+                  ImageFlowSpacing.sm,
+                  ImageFlowSpacing.md,
+                  ImageFlowSpacing.lg,
+                ),
+                child: SummaryFaceThumbnailStrip(
+                  faces: model.faces,
+                  selectedIndex: faceIndex,
+                  onSelect: viewModel.selectFace,
+                  onDeleteAt: viewModel.deleteFaceAt,
+                ),
               ),
             ],
           );

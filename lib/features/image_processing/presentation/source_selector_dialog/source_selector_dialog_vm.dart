@@ -38,21 +38,16 @@ class SourceSelectorDialogVM {
   }
 
   Future<void> captureFromCamera() async {
-    try {
-      await selectSource(ImageSource.camera);
-      await captureImage();
-    } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
-    }
+    await selectSource(ImageSource.camera);
+    await _captureSingleImage(
+      ImageSource.camera,
+      showErrorToast: true,
+    );
   }
 
   Future<void> captureFromGallery() async {
-    try {
-      await selectSource(ImageSource.gallery);
-      await captureBatchFromGallery();
-    } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
-    }
+    await selectSource(ImageSource.gallery);
+    await _captureMultipleImages(showErrorToast: true);
   }
 
   void markSourceDialogShown() {
@@ -65,61 +60,21 @@ class SourceSelectorDialogVM {
   }
 
   Future<void> captureImage() async {
-    final current = _state.value.data ?? const SourceSelectorDialogModel();
-    _state.value = BaseState.success(current.copyWith(isProcessing: true));
-    try {
-      final bytes = await _imagePickerService.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-      );
-      if (bytes != null) {
-        final current2 = _state.value.data ?? const SourceSelectorDialogModel();
-        _state.value = BaseState.success(
-          current2.copyWith(capturedImage: bytes),
-        );
-        await processImage(bytes);
-      }
-    } catch (e) {
-      rethrow;
-    } finally {
-      final current3 = _state.value.data ?? const SourceSelectorDialogModel();
-      _state.value = BaseState.success(current3.copyWith(isProcessing: false));
-    }
+    await _captureSingleImage(
+      ImageSource.camera,
+      showErrorToast: false,
+    );
   }
 
   Future<void> pickFromGallery() async {
-    _state.value = BaseState.success(model.copyWith(isProcessing: true));
-    try {
-      final images = await _imagePickerService.pickMultiImages(
-        imageQuality: 85,
-      );
-      if (images.isNotEmpty) {
-        _state.value = BaseState.success(
-          model.copyWith(capturedImage: images.first),
-        );
-        await processBatch(images);
-      }
-    } catch (e) {
-      rethrow;
-    } finally {
-      _state.value = BaseState.success(model.copyWith(isProcessing: false));
-    }
+    await _captureMultipleImages(
+      showErrorToast: false,
+      updateCapturedImage: true,
+    );
   }
 
   Future<void> captureBatchFromGallery() async {
-    _state.value = BaseState.success(model.copyWith(isProcessing: true));
-    try {
-      final images = await _imagePickerService.pickMultiImages(
-        imageQuality: 85,
-      );
-      if (images.isNotEmpty) {
-        await processBatch(images);
-      }
-    } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
-    } finally {
-      _state.value = BaseState.success(model.copyWith(isProcessing: false));
-    }
+    await _captureMultipleImages(showErrorToast: true);
   }
 
   Future<void> processImage(Uint8List imageBytes) async {
@@ -131,5 +86,65 @@ class SourceSelectorDialogVM {
       Routes.processing,
       arguments: ProcessingProps(images: images),
     );
+  }
+
+  void _setProcessing(bool value) {
+    _state.value = BaseState.success(model.copyWith(isProcessing: value));
+  }
+
+  void _setCapturedImage(Uint8List bytes) {
+    _state.value = BaseState.success(model.copyWith(capturedImage: bytes));
+  }
+
+  Future<void> _runProcessing(
+    Future<void> Function() action, {
+    required bool showErrorToast,
+  }) async {
+    _setProcessing(true);
+    try {
+      await action();
+    } catch (e) {
+      if (showErrorToast) {
+        _toastService.show(
+          AppStrings.failedToCaptureImage,
+          type: ToastType.error,
+        );
+      } else {
+        rethrow;
+      }
+    } finally {
+      _setProcessing(false);
+    }
+  }
+
+  Future<void> _captureSingleImage(
+    ImageSource source, {
+    required bool showErrorToast,
+  }) async {
+    await _runProcessing(() async {
+      final bytes = await _imagePickerService.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+      if (bytes == null) return;
+      _setCapturedImage(bytes);
+      await processImage(bytes);
+    }, showErrorToast: showErrorToast);
+  }
+
+  Future<void> _captureMultipleImages({
+    required bool showErrorToast,
+    bool updateCapturedImage = false,
+  }) async {
+    await _runProcessing(() async {
+      final images = await _imagePickerService.pickMultiImages(
+        imageQuality: 85,
+      );
+      if (images.isEmpty) return;
+      if (updateCapturedImage) {
+        _setCapturedImage(images.first);
+      }
+      await processBatch(images);
+    }, showErrorToast: showErrorToast);
   }
 }

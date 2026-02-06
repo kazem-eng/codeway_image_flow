@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_model.dart';
-import 'package:codeway_image_processing/ui_kit/components/before_after_comparison.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/_widgets/summary_before_after_comparison.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/_widgets/summary_face_thumbnail_strip.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
@@ -12,11 +14,15 @@ class SummaryFacePreviewSection extends StatelessWidget {
     required this.model,
     required this.onSelect,
     required this.onDeleteAt,
+    required this.onOpenDetail,
+    this.showThumbnails = true,
   });
 
   final SummaryModel model;
   final void Function(int) onSelect;
   final void Function(int) onDeleteAt;
+  final void Function(ProcessedImage) onOpenDetail;
+  final bool showThumbnails;
 
   @override
   Widget build(BuildContext context) {
@@ -34,73 +40,24 @@ class SummaryFacePreviewSection extends StatelessWidget {
         SizedBox(height: ImageFlowSpacing.sm),
         SizedBox(
           height: previewHeight,
-          child: BeforeAfterComparison(
+          child: SummaryBeforeAfterComparison(
             beforeBytes: selected.originalBytes,
             afterBytes: selected.processedBytes,
-            processingType: selected.image.processingType,
-            dateMillis: selected.image.createdAt,
-            fileSize: selected.image.fileSize,
+            onOpenBefore: () => onOpenDetail(selected.image),
+            onOpenAfter: () => onOpenDetail(selected.image),
           ),
         ),
         SizedBox(height: ImageFlowSpacing.md),
-        SizedBox(
-          height: ImageFlowSizes.faceThumbnailSize,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: faces.length,
-            separatorBuilder: (_, _) => SizedBox(width: ImageFlowSpacing.sm),
-            itemBuilder: (context, idx) {
-              final item = faces[idx];
-              final isSelected = idx == index;
-              return GestureDetector(
-                onTap: () => onSelect(idx),
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: ImageFlowDecorations.card(
-                        border: Border.all(
-                          color: isSelected
-                              ? ImageFlowColors.primaryStart
-                              : ImageFlowColors.border,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: ImageFlowShapes.roundedSmall(),
-                        child: Image.memory(
-                          item.processedBytes,
-                          width: ImageFlowSizes.faceThumbnailSize,
-                          height: ImageFlowSizes.faceThumbnailSize,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: ImageFlowSizes.thumbnailDeleteOffset,
-                      right: ImageFlowSizes.thumbnailDeleteOffset,
-                      child: GestureDetector(
-                        onTap: () => onDeleteAt(idx),
-                        child: Container(
-                          width: ImageFlowSizes.thumbnailDeleteSize,
-                          height: ImageFlowSizes.thumbnailDeleteSize,
-                          decoration: const BoxDecoration(
-                            color: ImageFlowColors.error,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: ImageFlowSizes.thumbnailDeleteIconSize,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+
+        if (showThumbnails) ...[
+          SummaryFaceThumbnailStrip(
+            faces: faces,
+            selectedIndex: index,
+            onSelect: onSelect,
+            onDeleteAt: onDeleteAt,
           ),
-        ),
-        SizedBox(height: ImageFlowSpacing.md),
+          SizedBox(height: ImageFlowSpacing.md),
+        ],
       ],
     );
   }

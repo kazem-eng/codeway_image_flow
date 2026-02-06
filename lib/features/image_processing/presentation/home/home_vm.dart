@@ -14,6 +14,7 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_model.dart';
 import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
+import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
 import 'package:get/get.dart';
 
 /// Home screen ViewModel.
@@ -42,6 +43,10 @@ class HomeVM {
 
   HomeModel get model => _state.value.data ?? const HomeModel();
 
+  Future<void> onReturn() async {
+    await loadHistory();
+  }
+
   Future<void> loadHistory() async {
     final currentModel = model;
     _state.value = BaseState.loading(currentModel);
@@ -51,9 +56,8 @@ class HomeVM {
       final visible = images
           .where((image) => !FaceBatchMetadata.isBatchItem(image.metadata))
           .toList();
-      _state.value = BaseState.success(
-        currentModel.copyWith(history: visible),
-      );
+      final items = visible.map(_buildHistoryItem).toList();
+      _state.value = BaseState.success(currentModel.copyWith(items: items));
     } catch (e) {
       _state.value = BaseState.error(
         exception: StorageException(message: e.toString()),
@@ -62,27 +66,49 @@ class HomeVM {
     }
   }
 
+  HomeHistoryItem _buildHistoryItem(ProcessedImage image) {
+    return HomeHistoryItem(
+      image: image,
+      title: _historyTitle(image),
+      subtitle: DateFormats.formatDateWithTime(image.createdAt),
+    );
+  }
+
+  String _historyTitle(ProcessedImage image) {
+    if (image.processingType.isFaceBatch) {
+      final count = FaceBatchMetadata.parseGroup(image.metadata).length;
+      return '${AppStrings.facesLabel} ($count)';
+    }
+    if (image.processingType.isFace) {
+      return AppStrings.faceResultScreenTitle;
+    }
+    if (image.processingType.isDocument) {
+      return _documentTitle(image.metadata);
+    }
+    return image.metadata ?? AppStrings.pdfDocument;
+  }
+
+  String _documentTitle(String? metadata) {
+    if (metadata == null || metadata.isEmpty) {
+      return AppStrings.pdfDocument;
+    }
+    final prefix = AppStrings.documentPrefix;
+    final cleaned = metadata.replaceFirst(
+      RegExp('^$prefix\\s\\d{4}-\\d{2}-\\d{2}\\s-\\s'),
+      '$prefix - ',
+    );
+    return cleaned;
+  }
 
   Future<void> deleteItem(String id) async {
     try {
       await _repository.init();
       final image = await _repository.getById(id);
-      if (image != null) {
-        if (image.processingType.isFaceBatch) {
-          final faceIds = FaceBatchMetadata.parseGroup(image.metadata);
-          for (final faceId in faceIds) {
-            final face = await _repository.getById(faceId);
-            if (face != null) {
-              await _fileStorageService.deleteProcessedImageFiles(face);
-              await _repository.delete(faceId);
-            }
-          }
-        }
-        // Delete files first - if this fails, DB entry remains for retry
-        await _fileStorageService.deleteProcessedImageFiles(image);
-        // Only delete DB entry if files are successfully deleted
-        await _repository.delete(id);
+      if (image == null) return;
+      if (image.processingType.isFaceBatch) {
+        await _deleteFaceBatchItems(image);
       }
+      await _deleteImageAndFiles(image);
       await loadHistory();
       _toastService.show(AppStrings.itemDeleted, type: ToastType.warning);
     } catch (e) {
@@ -90,30 +116,46 @@ class HomeVM {
     }
   }
 
-  Future<void> captureFromCamera() async {
-    try {
-      await _sourceSelectorDialogVm.captureFromCamera();
-      await loadHistory();
-    } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
+  Future<void> _deleteFaceBatchItems(ProcessedImage group) async {
+    final faceIds = FaceBatchMetadata.parseGroup(group.metadata);
+    for (final faceId in faceIds) {
+      await _deleteFaceItemById(faceId);
     }
+  }
+
+  Future<void> _deleteFaceItemById(String id) async {
+    final face = await _repository.getById(id);
+    if (face == null) return;
+    await _deleteImageAndFiles(face);
+  }
+
+  Future<void> _deleteImageAndFiles(ProcessedImage image) async {
+    // Delete files first so a failed delete keeps the DB entry for retry.
+    await _fileStorageService.deleteProcessedImageFiles(image);
+    await _repository.delete(image.id);
+  }
+
+  Future<void> captureFromCamera() async {
+    await _captureAndRefresh(_sourceSelectorDialogVm.captureFromCamera);
   }
 
   Future<void> captureFromGallery() async {
-    try {
-      await _sourceSelectorDialogVm.captureFromGallery();
-      await loadHistory();
-    } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
-    }
+    await _captureAndRefresh(_sourceSelectorDialogVm.captureFromGallery);
   }
 
   Future<void> captureBatchFromGallery() async {
+    await _captureAndRefresh(_sourceSelectorDialogVm.captureBatchFromGallery);
+  }
+
+  Future<void> _captureAndRefresh(Future<void> Function() action) async {
     try {
-      await _sourceSelectorDialogVm.captureBatchFromGallery();
+      await action();
       await loadHistory();
     } catch (e) {
-      _toastService.show(AppStrings.failedToCaptureImage, type: ToastType.error);
+      _toastService.show(
+        AppStrings.failedToCaptureImage,
+        type: ToastType.error,
+      );
     }
   }
 

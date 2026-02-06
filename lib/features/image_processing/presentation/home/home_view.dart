@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-
 import 'package:codeway_image_processing/base/mvvm_base/base.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/route_observer.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/_widgets/_add_fab.dart';
@@ -16,6 +14,8 @@ class HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<HomeView> with RouteAware {
+  HomeVM? _viewModel;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -33,8 +33,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
 
   @override
   void didPopNext() {
-    if (!Get.isRegistered<HomeVM>()) return;
-    Get.find<HomeVM>().loadHistory();
+    _viewModel?.onReturn();
   }
 
   @override
@@ -42,6 +41,7 @@ class _HomeViewState extends State<HomeView> with RouteAware {
     return BaseView<HomeVM>(
       vmFactory: () => VMFactories.createHomeVM(),
       initViewModel: (vm) async {
+        _viewModel = vm;
         await vm.loadHistory();
       },
       builder: (context, vm) => Scaffold(

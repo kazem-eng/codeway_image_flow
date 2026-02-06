@@ -25,6 +25,7 @@ final class NativeImageProcessing {
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "processDocument":
+      // Raw bytes in, processed JPEG bytes out.
       guard let typedData = call.arguments as? FlutterStandardTypedData else {
         result(
           FlutterError(
@@ -43,6 +44,7 @@ final class NativeImageProcessing {
       }
 
     case "createPdfFromImage":
+      // Build a single-page PDF with the supplied title.
       guard
         let args = call.arguments as? [String: Any],
         let typedData = args["bytes"] as? FlutterStandardTypedData,
@@ -97,6 +99,7 @@ final class NativeImageProcessing {
     if image.imageOrientation == .up && image.scale == 1 {
       return image
     }
+    // Render into a new context to normalize orientation/scale.
     let format = UIGraphicsImageRendererFormat()
     format.scale = image.scale
     format.opaque = false
@@ -113,6 +116,7 @@ final class NativeImageProcessing {
   }
 
   private func detectTextBlocks(in image: UIImage) throws -> [TextBlock] {
+    // ML Kit text recognition; blocking to simplify flow.
     let options = TextRecognizerOptions()
     let recognizer = TextRecognizer.textRecognizer(options: options)
     let visionImage = makeVisionImage(from: image)
@@ -135,6 +139,7 @@ final class NativeImageProcessing {
     guard let image = UIImage(data: data) else {
       return data
     }
+    // Normalize orientation then run the document pipeline.
     let normalized = normalize(image)
     let processed = processDocumentImage(normalized)
     return processed.jpegData(compressionQuality: 0.92) ?? data
@@ -147,19 +152,23 @@ final class NativeImageProcessing {
     let rectangle = detectDocumentRectangle(in: ciImage)
 
     var workingImage = ciImage
+    // Prefer rectangle detection + perspective correction.
     if let rectangle = rectangle,
        let corrected = applyPerspectiveCorrection(ciImage, rectangle: rectangle) {
       workingImage = corrected
+    // Fallback to text bounds crop if rectangle detection fails.
     } else if let cropped = cropToTextBounds(ciImage, blocks: blocks) {
       workingImage = cropped
     }
 
+    // Contrast + slight brightness for readability.
     let enhanced = enhanceContrast(workingImage)
     guard let output = renderUIImage(from: enhanced) else { return image }
     return output
   }
 
   private func detectDocumentRectangle(in ciImage: CIImage) -> VNRectangleObservation? {
+    // Vision rectangle detection for document edges.
     let request = VNDetectRectanglesRequest()
     request.maximumObservations = 1
     request.minimumConfidence = 0.6
@@ -180,6 +189,7 @@ final class NativeImageProcessing {
     _ ciImage: CIImage,
     rectangle: VNRectangleObservation
   ) -> CIImage? {
+    // Map VNRectangleObservation points into image space.
     let size = ciImage.extent.size
     let topLeft = CGPoint(x: rectangle.topLeft.x * size.width, y: rectangle.topLeft.y * size.height)
     let topRight = CGPoint(x: rectangle.topRight.x * size.width, y: rectangle.topRight.y * size.height)
@@ -202,6 +212,7 @@ final class NativeImageProcessing {
   }
 
   private func cropToTextBounds(_ ciImage: CIImage, blocks: [TextBlock]) -> CIImage? {
+    // Use text blocks to derive a safe crop rectangle.
     guard !blocks.isEmpty else { return nil }
     var minX = CGFloat.greatestFiniteMagnitude
     var minY = CGFloat.greatestFiniteMagnitude
@@ -222,6 +233,7 @@ final class NativeImageProcessing {
     let paddingY = rect.height * 0.05
     rect = rect.insetBy(dx: -paddingX, dy: -paddingY)
 
+    // Convert from UIKit (origin top-left) to CoreImage (origin bottom-left).
     let imageHeight = ciImage.extent.height
     let converted = CGRect(
       x: rect.origin.x,
@@ -235,6 +247,7 @@ final class NativeImageProcessing {
   }
 
   private func enhanceContrast(_ ciImage: CIImage) -> CIImage {
+    // Reduce saturation and boost contrast/brightness for document readability.
     guard let filter = CIFilter(name: "CIColorControls") else { return ciImage }
     filter.setValue(ciImage, forKey: kCIInputImageKey)
     filter.setValue(1.25, forKey: kCIInputContrastKey)
@@ -244,11 +257,13 @@ final class NativeImageProcessing {
   }
 
   private func renderUIImage(from ciImage: CIImage) -> UIImage? {
+    // Render CoreImage into a UIImage for return to Flutter.
     guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
     return UIImage(cgImage: cgImage, scale: 1, orientation: .up)
   }
 
   private func createPdfData(from image: UIImage, title: String) -> Data {
+    // Render image into an A4 page and center-fit by aspect ratio.
     let pageRect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8)
     let format = UIGraphicsPDFRendererFormat()
     format.documentInfo = [

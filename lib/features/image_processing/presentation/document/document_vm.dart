@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
-import 'package:codeway_image_processing/base/services/file_storage_service/file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
 import 'package:codeway_image_processing/base/services/image_picker_service/i_image_picker_service.dart';
@@ -14,10 +13,10 @@ import 'package:codeway_image_processing/base/services/navigation_service/i_navi
 import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
 import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
 import 'package:codeway_image_processing/features/image_processing/data/repositories/i_processed_image_repository.dart';
-import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_model.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/processed_image_saver.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
 
@@ -33,16 +32,17 @@ class DocumentVM {
   }) : _processingService = processingService,
        _imagePickerService = imagePickerService,
        _fileOpenService = fileOpenService,
-       _fileStorageService = fileStorageService,
-       _repository = repository,
-       _navigationService = navigationService;
+       _navigationService = navigationService,
+       _imageSaver = ProcessedImageSaver(
+         fileStorageService: fileStorageService,
+         repository: repository,
+       );
 
   final IImageProcessingService _processingService;
   final IImagePickerService _imagePickerService;
   final IFileOpenService _fileOpenService;
-  final IFileStorageService _fileStorageService;
-  final IProcessedImageRepository _repository;
   final INavigationService _navigationService;
+  final ProcessedImageSaver _imageSaver;
   final IToastService _toastService = Get.find<IToastService>();
 
   final _state = const BaseState<DocumentModel>.success(DocumentModel()).obs;
@@ -77,102 +77,86 @@ class DocumentVM {
     _state.value = BaseState.success(model.copyWith(selectedIndex: index));
   }
 
+  bool get _isBusy => model.isProcessingPage || model.isSaving;
+
+  void _setProcessingPage(bool value) {
+    _state.value = BaseState.success(model.copyWith(isProcessingPage: value));
+  }
+
+  void _updatePages(List<DocumentPage> pages, {int? selectedIndex}) {
+    _state.value = BaseState.success(
+      model.copyWith(
+        pages: pages,
+        selectedIndex: selectedIndex ?? model.selectedIndex,
+        hasUnsavedChanges: true,
+      ),
+    );
+  }
+
+  Future<DocumentPage?> _createDocumentPage(Uint8List bytes) async {
+    final type = await _processingService.detectContentType(bytes);
+    if (type.isFace) {
+      return null;
+    }
+    final processed = await _processingService.processDocument(bytes);
+    return DocumentPage(
+      id: _uuid.v4(),
+      originalBytes: bytes,
+      processedBytes: processed,
+    );
+  }
+
   Future<void> addPage(ImageSource source) async {
-    if (model.isProcessingPage || model.isSaving) return;
-    _state.value = BaseState.success(model.copyWith(isProcessingPage: true));
+    if (_isBusy) return;
+    _setProcessingPage(true);
     try {
       final bytes = await _imagePickerService.pickImage(
         source: source,
         imageQuality: 85,
       );
-      if (bytes == null) {
-        _state.value = BaseState.success(
-          model.copyWith(isProcessingPage: false),
-        );
-        return;
-      }
-      final type = await _processingService.detectContentType(bytes);
-      if (type.isFace) {
+      if (bytes == null) return;
+      final page = await _createDocumentPage(bytes);
+      if (page == null) {
         _toastService.show(
           AppStrings.multiPageDocumentsOnly,
           type: ToastType.warning,
         );
-        _state.value = BaseState.success(
-          model.copyWith(isProcessingPage: false),
-        );
         return;
       }
-      final processed = await _processingService.processDocument(bytes);
-      final updated = List<DocumentPage>.from(model.pages)
-        ..add(
-          DocumentPage(
-            id: _uuid.v4(),
-            originalBytes: bytes,
-            processedBytes: processed,
-          ),
-        );
-      _state.value = BaseState.success(
-        model.copyWith(
-          pages: updated,
-          selectedIndex: updated.length - 1,
-          isProcessingPage: false,
-          hasUnsavedChanges: true,
-        ),
-      );
+      final updated = List<DocumentPage>.from(model.pages)..add(page);
+      _updatePages(updated, selectedIndex: updated.length - 1);
       _toastService.show(AppStrings.pageAdded, type: ToastType.success);
     } catch (e) {
       _toastService.show(
         AppStrings.failedToCaptureImage,
         type: ToastType.error,
       );
-      _state.value = BaseState.success(model.copyWith(isProcessingPage: false));
+    } finally {
+      _setProcessingPage(false);
     }
   }
 
   Future<void> addPagesFromGallery() async {
-    if (model.isProcessingPage || model.isSaving) return;
-    _state.value = BaseState.success(model.copyWith(isProcessingPage: true));
+    if (_isBusy) return;
+    _setProcessingPage(true);
     try {
       final images = await _imagePickerService.pickMultiImages(
         imageQuality: 85,
       );
-      if (images.isEmpty) {
-        _state.value = BaseState.success(
-          model.copyWith(isProcessingPage: false),
-        );
-        return;
-      }
+      if (images.isEmpty) return;
       final updated = List<DocumentPage>.from(model.pages);
       var skippedFaces = false;
       for (final bytes in images) {
-        final type = await _processingService.detectContentType(bytes);
-        if (type.isFace) {
+        final page = await _createDocumentPage(bytes);
+        if (page == null) {
           skippedFaces = true;
           continue;
         }
-        final processed = await _processingService.processDocument(bytes);
-        updated.add(
-          DocumentPage(
-            id: _uuid.v4(),
-            originalBytes: bytes,
-            processedBytes: processed,
-          ),
-        );
+        updated.add(page);
       }
       if (updated.length != model.pages.length) {
-        _state.value = BaseState.success(
-          model.copyWith(
-            pages: updated,
-            selectedIndex: updated.length - 1,
-            isProcessingPage: false,
-            hasUnsavedChanges: true,
-          ),
-        );
+        _updatePages(updated, selectedIndex: updated.length - 1);
         _toastService.show(AppStrings.pageAdded, type: ToastType.success);
-      } else {
-        _state.value = BaseState.success(
-          model.copyWith(isProcessingPage: false),
-        );
       }
       if (skippedFaces) {
         _toastService.show(
@@ -185,7 +169,8 @@ class DocumentVM {
         AppStrings.failedToCaptureImage,
         type: ToastType.error,
       );
-      _state.value = BaseState.success(model.copyWith(isProcessingPage: false));
+    } finally {
+      _setProcessingPage(false);
     }
   }
 
@@ -239,13 +224,14 @@ class DocumentVM {
         title,
       );
       final pageLabel = pages.length == 1 ? AppStrings.page : AppStrings.pages;
-      final documentTitle = '$title - ${pages.length} $pageLabel';
-      final entity = await _saveResult(
+      final documentTitle =
+          '${AppStrings.documentPrefix} - ${pages.length} $pageLabel';
+      final entity = await _imageSaver.save(
         originalBytes: pages.first.originalBytes,
         processedBytes: pdfBytes,
         type: ProcessingType.document,
         isPdf: true,
-        documentTitle: documentTitle,
+        metadata: documentTitle,
       );
       _fileOpenService.open(entity.processedPath);
       _state.value = BaseState.success(
@@ -259,135 +245,7 @@ class DocumentVM {
     }
   }
 
-  Future<ProcessedImage> _saveResult({
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-    String? documentTitle,
-  }) async {
-    try {
-      final id = _uuid.v4();
-      final savedFiles = await _saveFiles(
-        id: id,
-        originalBytes: originalBytes,
-        processedBytes: processedBytes,
-        type: type,
-        isPdf: isPdf,
-      );
-      final entity = _createProcessedImageEntity(
-        id: id,
-        type: type,
-        savedFiles: savedFiles,
-        processedBytes: processedBytes,
-        documentTitle: documentTitle,
-      );
-      await _persistEntity(entity);
-      return entity;
-    } catch (e) {
-      _handleSaveError(e);
-      rethrow;
-    }
-  }
-
-  Future<_SavedFiles> _saveFiles({
-    required String id,
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-  }) async {
-    final directory = type.isFace
-        ? FileStorageService.facesDir
-        : FileStorageService.documentsDir;
-
-    String? originalPath;
-    String? processedPath;
-    String? thumbnailPath;
-
-    try {
-      originalPath = await _fileStorageService.saveProcessedImage(
-        originalBytes,
-        '$directory/${id}_original.jpg',
-      );
-
-      processedPath = isPdf
-          ? await _fileStorageService.savePdf(
-              processedBytes,
-              '$directory/${id}_processed.pdf',
-            )
-          : await _fileStorageService.saveProcessedImage(
-              processedBytes,
-              '$directory/${id}_processed.jpg',
-            );
-
-      thumbnailPath = await _fileStorageService.saveThumbnail(
-        originalBytes,
-        '${id}_thumb.jpg',
-      );
-
-      return _SavedFiles(
-        originalPath: originalPath,
-        processedPath: processedPath,
-        thumbnailPath: thumbnailPath,
-      );
-    } catch (e) {
-      if (originalPath != null) {
-        try {
-          await _fileStorageService.deleteFile(originalPath);
-        } catch (_) {}
-      }
-      if (processedPath != null) {
-        try {
-          await _fileStorageService.deleteFile(processedPath);
-        } catch (_) {}
-      }
-      if (thumbnailPath != null) {
-        try {
-          await _fileStorageService.deleteFile(thumbnailPath);
-        } catch (_) {}
-      }
-      rethrow;
-    }
-  }
-
-  ProcessedImage _createProcessedImageEntity({
-    required String id,
-    required ProcessingType type,
-    required _SavedFiles savedFiles,
-    required Uint8List processedBytes,
-    String? documentTitle,
-  }) {
-    return ProcessedImage(
-      id: id,
-      processingType: type,
-      originalPath: savedFiles.originalPath,
-      processedPath: savedFiles.processedPath,
-      thumbnailPath: savedFiles.thumbnailPath,
-      fileSize: processedBytes.length,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      metadata: documentTitle,
-    );
-  }
-
-  Future<void> _persistEntity(ProcessedImage entity) async {
-    await _repository.init();
-    await _repository.add(entity);
-  }
-
   void _handleSaveError(Object error) {
     _toastService.show(AppStrings.failedToSaveImagePdf, type: ToastType.error);
   }
-}
-
-class _SavedFiles {
-  const _SavedFiles({
-    required this.originalPath,
-    required this.processedPath,
-    required this.thumbnailPath,
-  });
-
-  final String originalPath;
-  final String processedPath;
-  final String thumbnailPath;
 }

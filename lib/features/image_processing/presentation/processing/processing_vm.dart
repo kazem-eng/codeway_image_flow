@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
-import 'package:codeway_image_processing/base/services/file_storage_service/file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/image_processing_service/i_image_processing_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
@@ -18,6 +17,7 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/features/image_processing/presentation/mixed_review/mixed_review_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
 import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/processed_image_saver.dart';
 
 /// Processing ViewModel.
 class ProcessingVM {
@@ -27,14 +27,15 @@ class ProcessingVM {
     required IProcessedImageRepository repository,
     required INavigationService navigationService,
   }) : _processingService = processingService,
-       _fileStorageService = fileStorageService,
-       _repository = repository,
-       _navigationService = navigationService;
+       _navigationService = navigationService,
+       _imageSaver = ProcessedImageSaver(
+         fileStorageService: fileStorageService,
+         repository: repository,
+       );
 
   final IImageProcessingService _processingService;
-  final IFileStorageService _fileStorageService;
-  final IProcessedImageRepository _repository;
   final INavigationService _navigationService;
+  final ProcessedImageSaver _imageSaver;
   final _state = const BaseState<ProcessingModel>.success(
     ProcessingModel(),
   ).obs;
@@ -57,6 +58,24 @@ class ProcessingVM {
 
   Future<void> startProcessing() async {
     if (model.isProcessing || model.items.isEmpty) return;
+    _prepareProcessingState();
+
+    final batch = _ProcessingBatch(faceGroupId: _uuid.v4());
+    await _processItems(batch);
+    _markProcessingCompleted();
+
+    final faceGroupEntity = await _finalizeFaceGroup(batch);
+    await _routeToOutcome(
+      docCount: batch.docCount,
+      faceCount: batch.faceCount,
+      documentPages: batch.documentPages,
+      faceResults: batch.faceResults,
+      documentResults: const <SummaryDocumentPreview>[],
+      faceGroupEntity: faceGroupEntity,
+    );
+  }
+
+  void _prepareProcessingState() {
     _state.value = BaseState.success(
       model.copyWith(
         isProcessing: true,
@@ -66,71 +85,12 @@ class ProcessingVM {
         processingStep: ProcessingStep.detectingContent,
       ),
     );
+  }
 
-    final documentPages = <DocumentSeedPage>[];
-    final faceResults = <SummaryFacePreview>[];
-    final faceEntities = <ProcessedImage>[];
-    var docCount = 0;
-    var faceCount = 0;
-    final faceGroupId = _uuid.v4();
-
+  Future<void> _processItems(_ProcessingBatch batch) async {
     for (var i = 0; i < model.items.length; i++) {
-      _setCurrentIndex(i);
-      _setProcessingStep(ProcessingStep.detectingContent);
-      _updateItemStatus(i, ProcessingItemStatus.processing);
       try {
-        final originalBytes = model.items[i].originalBytes;
-        final type = await _processingService.detectContentType(originalBytes);
-        _updateItem(i, type: type);
-        if (type.isFace) {
-          _setProcessingStep(ProcessingStep.detectingFaces);
-          final processed = await _processingService.detectAndProcessFaces(
-            originalBytes,
-          );
-          _setProcessingStep(ProcessingStep.saving);
-          faceCount += 1;
-          final entity = await _saveResult(
-            originalBytes: originalBytes,
-            processedBytes: processed,
-            type: ProcessingType.face,
-            isPdf: false,
-            metadata: FaceBatchMetadata.item(faceGroupId),
-          );
-          faceEntities.add(entity);
-          faceResults.add(
-            SummaryFacePreview(
-              image: entity,
-              originalBytes: originalBytes,
-              processedBytes: processed,
-            ),
-          );
-          _updateItem(
-            i,
-            status: ProcessingItemStatus.success,
-            type: type,
-            result: entity,
-            errorMessage: null,
-          );
-        } else {
-          _setProcessingStep(ProcessingStep.processingDocument);
-          final processed = await _processingService.processDocument(
-            originalBytes,
-          );
-          docCount += 1;
-          documentPages.add(
-            DocumentSeedPage(
-              originalBytes: originalBytes,
-              processedBytes: processed,
-            ),
-          );
-          _updateItem(
-            i,
-            status: ProcessingItemStatus.success,
-            type: type,
-            result: null,
-            errorMessage: null,
-          );
-        }
+        await _processItem(i, batch);
       } catch (e) {
         _updateItem(
           i,
@@ -140,7 +100,85 @@ class ProcessingVM {
       }
       _incrementCompleted();
     }
+  }
 
+  Future<void> _processItem(int index, _ProcessingBatch batch) async {
+    _setCurrentIndex(index);
+    _setProcessingStep(ProcessingStep.detectingContent);
+    _updateItemStatus(index, ProcessingItemStatus.processing);
+
+    final originalBytes = model.items[index].originalBytes;
+    final type = await _processingService.detectContentType(originalBytes);
+    _updateItem(index, type: type);
+
+    if (type.isFace) {
+      await _processFaceItem(index, originalBytes, batch);
+      return;
+    }
+    await _processDocumentItem(index, originalBytes, batch);
+  }
+
+  Future<void> _processFaceItem(
+    int index,
+    Uint8List originalBytes,
+    _ProcessingBatch batch,
+  ) async {
+    _setProcessingStep(ProcessingStep.detectingFaces);
+    final processed = await _processingService.detectAndProcessFaces(
+      originalBytes,
+    );
+    _setProcessingStep(ProcessingStep.saving);
+    final entity = await _imageSaver.save(
+      originalBytes: originalBytes,
+      processedBytes: processed,
+      type: ProcessingType.face,
+      isPdf: false,
+      metadata: FaceBatchMetadata.item(batch.faceGroupId),
+    );
+    batch.faceCount += 1;
+    batch.faceEntities.add(entity);
+    batch.faceResults.add(
+      SummaryFacePreview(
+        image: entity,
+        originalBytes: originalBytes,
+        processedBytes: processed,
+      ),
+    );
+    _updateItem(
+      index,
+      status: ProcessingItemStatus.success,
+      type: ProcessingType.face,
+      result: entity,
+      errorMessage: null,
+    );
+  }
+
+  Future<void> _processDocumentItem(
+    int index,
+    Uint8List originalBytes,
+    _ProcessingBatch batch,
+  ) async {
+    _setProcessingStep(ProcessingStep.processingDocument);
+    final processed = await _processingService.processDocument(
+      originalBytes,
+    );
+    batch.docCount += 1;
+    batch.documentPages.add(
+      DocumentSeedPage(
+        originalBytes: originalBytes,
+        processedBytes: processed,
+      ),
+    );
+    _updateItem(
+      index,
+      status: ProcessingItemStatus.success,
+      type: ProcessingType.document,
+      result: null,
+      errorMessage: null,
+    );
+  }
+
+  void _markProcessingCompleted() {
     _state.value = BaseState.success(
       model.copyWith(
         isProcessing: false,
@@ -149,27 +187,20 @@ class ProcessingVM {
         processingStep: ProcessingStep.done,
       ),
     );
+  }
 
-    ProcessedImage? faceGroupEntity;
-    if (faceEntities.length > 1) {
-      faceGroupEntity = await _saveFaceGroupEntity(
-        groupId: faceGroupId,
-        faces: faceEntities,
+  Future<ProcessedImage?> _finalizeFaceGroup(_ProcessingBatch batch) async {
+    if (batch.faceEntities.length > 1) {
+      return _saveFaceGroupEntity(
+        groupId: batch.faceGroupId,
+        faces: batch.faceEntities,
       );
-    } else {
-      await _stripFaceBatchMetadataIfSingle(faceEntities, faceResults);
     }
-
-    final documentResults = <SummaryDocumentPreview>[];
-
-    await _routeToOutcome(
-      docCount: docCount,
-      faceCount: faceCount,
-      documentPages: documentPages,
-      faceResults: faceResults,
-      documentResults: documentResults,
-      faceGroupEntity: faceGroupEntity,
+    await _stripFaceBatchMetadataIfSingle(
+      batch.faceEntities,
+      batch.faceResults,
     );
+    return null;
   }
 
   void _setCurrentIndex(int index) {
@@ -252,116 +283,6 @@ class ProcessingVM {
     );
   }
 
-  Future<ProcessedImage> _saveResult({
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-    String? metadata,
-  }) async {
-    try {
-      final id = _uuid.v4();
-      final savedFiles = await _saveFiles(
-        id: id,
-        originalBytes: originalBytes,
-        processedBytes: processedBytes,
-        type: type,
-        isPdf: isPdf,
-      );
-      final entity = _createProcessedImageEntity(
-        id: id,
-        type: type,
-        savedFiles: savedFiles,
-        processedBytes: processedBytes,
-        metadata: metadata,
-      );
-      await _persistEntity(entity);
-      return entity;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<_SavedFiles> _saveFiles({
-    required String id,
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-  }) async {
-    final directory = type.isFace
-        ? FileStorageService.facesDir
-        : FileStorageService.documentsDir;
-
-    String? originalPath;
-    String? processedPath;
-    String? thumbnailPath;
-
-    try {
-      originalPath = await _fileStorageService.saveProcessedImage(
-        originalBytes,
-        '$directory/${id}_original.jpg',
-      );
-
-      processedPath = isPdf
-          ? await _fileStorageService.savePdf(
-              processedBytes,
-              '$directory/${id}_processed.pdf',
-            )
-          : await _fileStorageService.saveProcessedImage(
-              processedBytes,
-              '$directory/${id}_processed.jpg',
-            );
-
-      thumbnailPath = await _fileStorageService.saveThumbnail(
-        originalBytes,
-        '${id}_thumb.jpg',
-      );
-
-      return _SavedFiles(
-        originalPath: originalPath,
-        processedPath: processedPath,
-        thumbnailPath: thumbnailPath,
-      );
-    } catch (e) {
-      if (originalPath != null) {
-        try {
-          await _fileStorageService.deleteFile(originalPath);
-        } catch (_) {}
-      }
-      if (processedPath != null) {
-        try {
-          await _fileStorageService.deleteFile(processedPath);
-        } catch (_) {}
-      }
-      if (thumbnailPath != null) {
-        try {
-          await _fileStorageService.deleteFile(thumbnailPath);
-        } catch (_) {}
-      }
-      rethrow;
-    }
-  }
-
-  ProcessedImage _createProcessedImageEntity({
-    required String id,
-    required ProcessingType type,
-    required _SavedFiles savedFiles,
-    required Uint8List processedBytes,
-    String? metadata,
-  }) {
-    return ProcessedImage(
-      id: id,
-      processingType: type,
-      originalPath: savedFiles.originalPath,
-      processedPath: savedFiles.processedPath,
-      thumbnailPath: savedFiles.thumbnailPath,
-      fileSize: processedBytes.length,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      metadata: metadata,
-    );
-  }
-
   Future<ProcessedImage> _saveFaceGroupEntity({
     required String groupId,
     required List<ProcessedImage> faces,
@@ -381,13 +302,8 @@ class ProcessingVM {
         faces.map((f) => f.id).toList(),
       ),
     );
-    await _persistEntity(entity);
+    await _imageSaver.persist(entity);
     return entity;
-  }
-
-  Future<void> _persistEntity(ProcessedImage entity) async {
-    await _repository.init();
-    await _repository.add(entity);
   }
 
   Future<void> _stripFaceBatchMetadataIfSingle(
@@ -407,8 +323,7 @@ class ProcessingVM {
       createdAt: single.createdAt,
       metadata: null,
     );
-    await _repository.init();
-    await _repository.add(updated);
+    await _imageSaver.persist(updated);
     faceEntities[0] = updated;
     if (faceResults.isNotEmpty) {
       final preview = faceResults.first;
@@ -421,14 +336,13 @@ class ProcessingVM {
   }
 }
 
-class _SavedFiles {
-  const _SavedFiles({
-    required this.originalPath,
-    required this.processedPath,
-    required this.thumbnailPath,
-  });
+class _ProcessingBatch {
+  _ProcessingBatch({required this.faceGroupId});
 
-  final String originalPath;
-  final String processedPath;
-  final String thumbnailPath;
+  final String faceGroupId;
+  final List<DocumentSeedPage> documentPages = [];
+  final List<SummaryFacePreview> faceResults = [];
+  final List<ProcessedImage> faceEntities = [];
+  int docCount = 0;
+  int faceCount = 0;
 }
