@@ -2,8 +2,21 @@
 
 A Flutter application for image processing and analysis using Google ML Kit. The app can detect faces, process documents, and create PDFs from images with a clean, modern UI.
 
+## 🎥 Feature Videos
+
+Short recordings from key flows in the app.
+
+<video src="docs/videos/feature_01.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_02.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_03.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_04.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_05.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_06.mp4" controls muted playsinline width="320"></video>
+<video src="docs/videos/feature_07.mp4" controls muted playsinline width="320"></video>
+
 ## 📋 Table of Contents
 
+- [Feature Videos](#-feature-videos)
 - [Features](#-features)
 - [Architecture](#️-architecture)
 - [Folder Structure](#-folder-structure)
