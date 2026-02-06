@@ -132,17 +132,20 @@ Before you begin, ensure you have the following installed:
 ## 📦 Installation & Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd codeway_image_processing
    ```
 
 2. **Install dependencies**
+
    ```bash
    flutter pub get
    ```
 
 3. **iOS Setup** (macOS only)
+
    ```bash
    cd ios
    pod install
@@ -156,6 +159,7 @@ Before you begin, ensure you have the following installed:
 ## 🚀 How to Run
 
 From the project root:
+
 ```bash
 flutter pub get
 flutter run
@@ -206,6 +210,7 @@ Each feature follows the MVVM pattern:
 ### State Management
 
 The app uses a custom `BaseState` wrapper with three states:
+
 - `loading`: Operation in progress
 - `success`: Operation completed successfully
 - `error`: Operation failed
@@ -245,21 +250,25 @@ void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
 ### Running Tests
 
 Run all tests:
+
 ```bash
 flutter test
 ```
 
 Run specific test file:
+
 ```bash
 flutter test test/presentation/home/home_vm_test.dart
 ```
 
 Run tests with coverage:
+
 ```bash
 flutter test --coverage
 ```
 
 Generate coverage report:
+
 ```bash
 genhtml coverage/lcov.info -o coverage/html
 open coverage/html/index.html
@@ -270,6 +279,7 @@ open coverage/html/index.html
 The project includes comprehensive unit tests for:
 
 **ViewModels:**
+
 - ✅ `HomeVM` - History loading, deletion, navigation, PDF operations
 - ✅ `ProcessingVM` - Image processing flow, face/document detection
 - ✅ `DetailVM` - Detail view, image loading, deletion
@@ -277,36 +287,29 @@ The project includes comprehensive unit tests for:
 - ✅ `SummaryVM` - Summary view and face batch management
 - ✅ `SourceSelectorDialogVM` - Camera/gallery selection and batch launch
 
-**Services:**
-- ✅ `NavigationService` - Navigation methods and null-safety
-- ✅ `ToastService` - Toast message display
-- ⚠️ `ImagePickerService` - Basic tests (requires integration tests for full coverage)
-- ⚠️ `ImageProcessingService` - Basic tests (requires ML Kit integration)
-
-**Repositories:**
-- ⚠️ `ProcessedImageRepository` - Basic structure (requires SQLite integration tests)
-
 See `test/README.md` for detailed test documentation.
 
 ## 🐛 Troubleshooting
 
 ### iOS Build Issues
+
 - Run `pod install` in `ios/` directory
 - Clean build: `flutter clean && flutter pub get`
 - Check Xcode version compatibility
 
 ### Android Build Issues
+
 - Ensure Android SDK is properly configured
 - Check `android/app/build.gradle` for correct SDK versions
 - Clean build: `flutter clean && flutter pub get`
 
 ### Permission Issues
+
 - Check `Info.plist` (iOS) and `AndroidManifest.xml` (Android)
 - Ensure permissions are requested at runtime
 
 ## 📄 License
 
-This project is private and proprietary.
----
+## This project is private and proprietary.
 
 **Built with Flutter** 💙
