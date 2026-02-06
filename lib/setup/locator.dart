@@ -16,12 +16,12 @@ import 'package:codeway_image_processing/base/services/toast_service/i_toast_ser
 import 'package:codeway_image_processing/base/services/toast_service/toast_service.dart';
 import 'package:codeway_image_processing/features/image_processing/data/repositories/i_processed_image_repository.dart';
 import 'package:codeway_image_processing/features/image_processing/data/repositories/processed_image_repository.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/capture/capture_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/source_selector_dialog/source_selector_dialog_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_vm.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/multi_page/multi_page_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/document_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_vm.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/result/result_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_vm.dart';
 
 /// Setup dependency injection using GetX. Call once at app startup.
 void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
@@ -53,9 +53,9 @@ void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
 /// Factory functions for ViewModels. Creates fresh instances per route.
 /// Used by BaseView to instantiate ViewModels with their dependencies.
 class VMFactories {
-  /// Creates a new CaptureVM instance with dependencies resolved from GetX.
-  static CaptureVM createCaptureVM() {
-    return CaptureVM(
+  /// Creates a new SourceSelectorDialogVM instance with dependencies resolved from GetX.
+  static SourceSelectorDialogVM createSourceSelectorDialogVM() {
+    return SourceSelectorDialogVM(
       navigationService: Get.find<INavigationService>(),
       imagePickerService: Get.find<IImagePickerService>(),
     );
@@ -68,7 +68,8 @@ class VMFactories {
       fileStorageService: Get.find<IFileStorageService>(),
       fileOpenService: Get.find<IFileOpenService>(),
       navigationService: Get.find<INavigationService>(),
-      captureVm: createCaptureVM(), // Direct creation, not Get.find
+      sourceSelectorDialogVm:
+          createSourceSelectorDialogVM(), // Direct creation, not Get.find
     );
   }
 
@@ -82,9 +83,9 @@ class VMFactories {
     );
   }
 
-  /// Creates a new MultiPageVM instance with dependencies resolved from GetX.
-  static MultiPageVM createMultiPageVM() {
-    return MultiPageVM(
+  /// Creates a new DocumentVM instance with dependencies resolved from GetX.
+  static DocumentVM createDocumentVM() {
+    return DocumentVM(
       processingService: Get.find<IImageProcessingService>(),
       imagePickerService: Get.find<IImagePickerService>(),
       fileOpenService: Get.find<IFileOpenService>(),
@@ -94,12 +95,14 @@ class VMFactories {
     );
   }
 
-  /// Creates a new ResultVM instance with dependencies resolved from GetX.
-  static ResultVM createResultVM() {
-    return ResultVM(
+  /// Creates a new SummaryVM instance with dependencies resolved from GetX.
+  static SummaryVM createSummaryVM({bool closeOnEmpty = true}) {
+    return SummaryVM(
+      navigationService: Get.find<INavigationService>(),
+      repository: Get.find<IProcessedImageRepository>(),
       fileStorageService: Get.find<IFileStorageService>(),
       fileOpenService: Get.find<IFileOpenService>(),
-      navigationService: Get.find<INavigationService>(),
+      closeOnEmpty: closeOnEmpty,
     );
   }
 

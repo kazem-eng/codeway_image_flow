@@ -23,7 +23,7 @@ class AddFab extends StatelessWidget {
         },
         onGallery: () {
           Navigator.of(ctx).pop(); // Close dialog first
-          vm.captureFromGallery();
+          vm.captureBatchFromGallery();
         },
       ),
     );

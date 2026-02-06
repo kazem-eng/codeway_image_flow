@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:mockito/mockito.dart';
 
-import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
+import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_vm.dart';
 
@@ -21,7 +21,6 @@ void main() {
   late MockIFileStorageService mockFileStorageService;
   late MockIProcessedImageRepository mockRepository;
   late MockINavigationService mockNavigationService;
-  late MockIToastService mockToastService;
 
   void createProcessingVM() {
     processingVM = ProcessingVM(
@@ -39,15 +38,11 @@ void main() {
     mockFileStorageService = MockIFileStorageService();
     mockRepository = MockIProcessedImageRepository();
     mockNavigationService = MockINavigationService();
-    mockToastService = MockIToastService();
 
-    Get.put<IToastService>(mockToastService);
-    // Ensure mocks are in clean state
     reset(mockProcessingService);
     reset(mockFileStorageService);
     reset(mockRepository);
     reset(mockNavigationService);
-    reset(mockToastService);
   });
 
   tearDown(() {
@@ -56,40 +51,27 @@ void main() {
 
   group('ProcessingVM', () {
     group('init', () {
-      test('should initialize with image bytes', () {
+      test('should initialize with image list', () {
         // Arrange
         final testBytes = TestHelpers.createTestImageBytes();
         createProcessingVM();
 
         // Act
-        processingVM.init(testBytes);
+        processingVM.init([testBytes]);
 
         // Assert
-        expect(processingVM.model.originalImage, testBytes);
+        expect(processingVM.model.items.length, 1);
+        expect(processingVM.model.items.first.originalBytes, testBytes);
         expect(processingVM.state.isSuccess, true);
-      });
-
-      test('should handle null image bytes', () {
-        // Arrange
-        createProcessingVM();
-        // Act
-        processingVM.init(null);
-
-        // Assert
-        expect(processingVM.model.originalImage, isNull);
       });
     });
 
     group('startProcessing', () {
-      test('should start processing when image bytes exist', () async {
+      test('should process face images and navigate to summary', () async {
         // Arrange
-        reset(mockProcessingService);
-        reset(mockFileStorageService);
-        reset(mockRepository);
-        reset(mockNavigationService);
         final testBytes = TestHelpers.createTestImageBytes();
         createProcessingVM();
-        processingVM.init(testBytes);
+        processingVM.init([testBytes]);
         when(
           mockProcessingService.detectContentType(testBytes),
         ).thenAnswer((_) async => ProcessingType.face);
@@ -106,13 +88,6 @@ void main() {
         when(
           mockRepository.add(anyProcessedImage),
         ).thenAnswer((_) async => 'test-id');
-        when(mockNavigationService.goBack()).thenReturn(null);
-        when(
-          mockNavigationService.replaceWith(
-            argThat(isA<String>()),
-            arguments: anyNamed('arguments'),
-          ),
-        ).thenAnswer((_) async => {});
         when(
           mockNavigationService.replaceWith(
             anyString,
@@ -125,77 +100,21 @@ void main() {
 
         // Assert
         verify(mockProcessingService.detectContentType(testBytes)).called(1);
-      });
-
-      test('should not process when image bytes are null', () async {
-        // Arrange
-        reset(mockProcessingService);
-        createProcessingVM();
-        processingVM.init(null);
-
-        // Act
-        await processingVM.startProcessing();
-
-        // Assert
-        verifyNever(mockProcessingService.detectContentType(anyUint8List));
-      });
-    });
-
-    group('processImage', () {
-      test('should process face image successfully', () async {
-        // Arrange
-        reset(mockProcessingService);
-        reset(mockFileStorageService);
-        reset(mockRepository);
-        reset(mockNavigationService);
-        final testBytes = TestHelpers.createTestImageBytes();
-        createProcessingVM();
-        processingVM.init(testBytes);
-        when(
-          mockProcessingService.detectContentType(testBytes),
-        ).thenAnswer((_) async => ProcessingType.face);
-        when(
-          mockProcessingService.detectAndProcessFaces(testBytes),
-        ).thenAnswer((_) async => testBytes);
-        when(
-          mockFileStorageService.saveProcessedImage(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/original.jpg');
-        when(
-          mockFileStorageService.saveProcessedImage(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/processed.jpg');
-        when(
-          mockFileStorageService.saveThumbnail(anyUint8List, anyString),
-        ).thenAnswer((_) async => '/test/thumb.jpg');
-        when(mockRepository.init()).thenAnswer((_) async => {});
-        when(
-          mockRepository.add(anyProcessedImage),
-        ).thenAnswer((_) async => 'test-id');
-        when(mockNavigationService.goBack()).thenReturn(null);
-        when(
-          mockNavigationService.goTo(
-            anyString,
-            arguments: anyNamed('arguments'),
-          ),
-        ).thenAnswer((_) async => {});
-
-        // Act
-        await processingVM.processImage();
-
-        // Assert
-        verify(mockProcessingService.detectContentType(testBytes)).called(1);
+        verify(mockProcessingService.detectAndProcessFaces(testBytes)).called(1);
         verify(
-          mockProcessingService.detectAndProcessFaces(testBytes),
+          mockNavigationService.replaceWith(
+            Routes.summary,
+            arguments: anyNamed('arguments'),
+          ),
         ).called(1);
       });
 
-      test('should process document image successfully', () async {
+      test('should process document images and navigate to multi-page', () async {
         // Arrange
-        reset(mockProcessingService);
-        reset(mockNavigationService);
         final testBytes = TestHelpers.createTestImageBytes();
         final processedImageBytes = Uint8List.fromList([10, 20, 30]);
         createProcessingVM();
-        processingVM.init(testBytes);
+        processingVM.init([testBytes]);
         when(
           mockProcessingService.detectContentType(testBytes),
         ).thenAnswer((_) async => ProcessingType.document);
@@ -203,85 +122,35 @@ void main() {
           mockProcessingService.processDocument(testBytes),
         ).thenAnswer((_) async => processedImageBytes);
         when(
-          mockNavigationService.goTo(
+          mockNavigationService.replaceWith(
             anyString,
             arguments: anyNamed('arguments'),
           ),
         ).thenAnswer((_) async => {});
 
         // Act
-        await processingVM.processImage();
+        await processingVM.startProcessing();
 
         // Assert
         verify(mockProcessingService.detectContentType(testBytes)).called(1);
         verify(mockProcessingService.processDocument(testBytes)).called(1);
         verify(
           mockNavigationService.replaceWith(
-            argThat(isA<String>()),
+            Routes.multiPage,
             arguments: anyNamed('arguments'),
           ),
         ).called(1);
       });
 
-      test('should handle face detection error', () async {
+      test('should skip processing when no items', () async {
         // Arrange
-        reset(mockProcessingService);
-        reset(mockNavigationService);
-        reset(mockToastService);
-        final testBytes = TestHelpers.createTestImageBytes();
         createProcessingVM();
-        processingVM.init(testBytes);
-        when(
-          mockProcessingService.detectContentType(testBytes),
-        ).thenAnswer((_) async => ProcessingType.face);
-        when(
-          mockProcessingService.detectAndProcessFaces(testBytes),
-        ).thenThrow(Exception('No faces detected'));
-        when(mockNavigationService.goBack()).thenReturn(null);
 
         // Act
-        await processingVM.processImage();
+        await processingVM.startProcessing();
 
         // Assert
-        expect(processingVM.state.isError, true);
-        verify(
-          mockToastService.show(
-            argThat(contains('No faces detected')),
-            type: anyNamed('type'),
-          ),
-        ).called(1);
-        verify(mockNavigationService.goBack()).called(1);
-      });
-
-      test('should handle save error', () async {
-        // Arrange
-        reset(mockProcessingService);
-        reset(mockFileStorageService);
-        reset(mockToastService);
-        final testBytes = TestHelpers.createTestImageBytes();
-        createProcessingVM();
-        processingVM.init(testBytes);
-        when(
-          mockProcessingService.detectContentType(testBytes),
-        ).thenAnswer((_) async => ProcessingType.face);
-        when(
-          mockProcessingService.detectAndProcessFaces(testBytes),
-        ).thenAnswer((_) async => testBytes);
-        when(
-          mockFileStorageService.saveProcessedImage(anyUint8List, anyString),
-        ).thenThrow(Exception('Save failed'));
-
-        // Act
-        await processingVM.processImage();
-
-        // Assert
-        expect(processingVM.state.isError, true);
-        verify(
-          mockToastService.show(
-            argThat(contains('Failed to save')),
-            type: anyNamed('type'),
-          ),
-        ).called(1);
+        verifyNever(mockProcessingService.detectContentType(anyUint8List));
       });
     });
   });

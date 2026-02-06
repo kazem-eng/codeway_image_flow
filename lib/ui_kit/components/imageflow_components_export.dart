@@ -1,10 +1,13 @@
 export 'delete_confirm_dialog.dart';
+export 'before_after_comparison.dart';
+export 'discard_confirm_dialog.dart';
 export 'dialog_helpers.dart';
 export 'imageflow_app_bar.dart';
 export 'imageflow_button.dart';
 export 'imageflow_error_widget.dart';
 export 'imageflow_loader.dart';
 export 'imageflow_toast.dart';
+export 'metadata_display.dart';
 export 'permission_error_dialog.dart';
 export 'source_choice_dialog.dart';
 export 'source_selector.dart';

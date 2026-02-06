@@ -1,33 +1,34 @@
-import 'dart:typed_data';
-
-import 'package:codeway_image_processing/base/mvvm_base/base.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/processing/_widgets/_processing_body.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_vm.dart';
-import 'package:codeway_image_processing/setup/locator.dart';
-import 'package:codeway_image_processing/ui_kit/styles/theme_data.dart';
 import 'package:flutter/material.dart';
+import 'package:codeway_image_processing/base/mvvm_base/base.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/processing/_widgets/processing_body.dart';
+import 'package:codeway_image_processing/setup/locator.dart';
+import 'package:codeway_image_processing/ui_kit/components/imageflow_app_bar.dart';
+import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
+import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
-/// Processing screen view. Receives [imageBytes] as optional prop; VM is created via [BaseView].
+/// Processing screen.
 class ProcessingView extends StatelessWidget {
-  const ProcessingView({super.key, this.imageBytes});
+  const ProcessingView({super.key, required this.props});
 
-  final Uint8List? imageBytes;
+  final ProcessingProps props;
 
   @override
   Widget build(BuildContext context) {
     return BaseView<ProcessingVM>(
       vmFactory: () => VMFactories.createProcessingVM(),
       initViewModel: (vm) async {
-        vm.init(imageBytes);
+        vm.init(props.images);
         await vm.startProcessing();
       },
       builder: (context, vm) => Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: ImageFlowSpacing.screenPadding,
-            child: const ProcessingBody(),
-          ),
+        appBar: ImageFlowAppBar(
+          title: AppStrings.processingTitle,
+          titleStyle: ImageFlowTextStyles.appTitle,
+          titleSpacing: ImageFlowSpacing.md,
         ),
+        body: const ProcessingBody(),
       ),
     );
   }

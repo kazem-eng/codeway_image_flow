@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:codeway_image_processing/base/mvvm_base/base_vm.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/detail/_widgets/_metadata_display.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/_widgets/_pdf_viewer_button.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/_widgets/_swipe_image.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_model.dart';

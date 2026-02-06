@@ -163,14 +163,23 @@ class ImageFlowSizes {
   // Container sizes
   static const double iconContainer = 44;
   static const double buttonHeight = 56;
-  static const double appBarHeight = 100;
-  static const double appBarLeftPadding = -20;
+  static const double appBarHeight = 56;
+  static const double appBarLeftPadding = 0;
 
   // Image sizes
   static const double thumbnailSize = 44;
+  static const double batchItemThumbnailSize = 56;
+  static const double faceThumbnailSize = 72;
+  static const double thumbnailDeleteSize = 18;
+  static const double thumbnailDeleteIconSize = 12;
+  static const double thumbnailDeleteOffset = 4;
   static const double previewImageHeight = 140;
   static const double previewCardMinHeight = 160;
   static const double previewCardOuterMinHeight = 200;
+  static const double documentPreviewHeight = 220;
+
+  // Face preview
+  static const double facePreviewHeightFactor = 0.52;
 
   // Padding values
   static const double cardInnerPadding = 16;
@@ -183,6 +192,7 @@ class ImageFlowSizes {
 
   // Progress bar
   static const double progressBarHeight = 4;
+  static const double progressBarHeightLarge = 8;
   static const double progressBarRadius = 2;
 
   // Source tile (camera/gallery)

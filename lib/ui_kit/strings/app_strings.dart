@@ -32,11 +32,14 @@ class AppStrings {
   static const String delete = 'Delete';
   static const String openSettings = 'Open Settings';
   static const String done = 'Done';
+  static const String open = 'Open';
+  static const String discard = 'Discard';
 
   // Source Selection
   static const String chooseSource = 'Choose Source';
   static const String camera = 'Camera';
   static const String gallery = 'Gallery';
+  static const String processingLabel = 'Processing';
 
   // Loading Messages
   static const String loading = 'Loading...';
@@ -70,17 +73,30 @@ class AppStrings {
   static const String multiPageDocumentsOnly =
       'Multi-page PDFs support documents only.';
   static const String pageAdded = 'Page added.';
+  static const String discardChangesTitle = 'Discard changes?';
+  static const String discardChangesContent =
+      'Your document edits will be lost.';
 
   // PDF Labels
   static const String pdf = 'PDF';
   static const String openPdf = 'Open PDF';
   static const String pdfDocument = 'PDF Document';
-  static const String exportPdf = 'Export PDF';
+  static const String savePdf = 'Save PDF';
   static const String addPage = 'Add Page';
+  static const String editPages = 'Edit Pages';
   static const String pagesLabel = 'Pages';
   static const String pageLabel = 'Page';
   static const String page = 'page';
   static const String pages = 'pages';
+
+  // Processing
+  static const String processingTitle = 'Processing';
+  static const String processingQueued = 'Queued';
+  static const String processingCompleted = 'Completed';
+  static const String processingFailed = 'Failed';
+  static const String summaryTitle = 'Summary';
+  static const String itemLabel = 'Item';
+  static const String noItemsProcessed = 'No items were processed.';
 
   // Image Labels
   static const String filtered = 'Filtered';
@@ -98,5 +114,6 @@ class AppStrings {
   // Processing Metadata
   static const String facesProcessed = 'faces:processed';
   static const String face = 'Face';
+  static const String facesLabel = 'Faces';
   static const String documentType = 'Document';
 }

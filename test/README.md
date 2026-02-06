@@ -9,16 +9,14 @@ test/
 ├── helpers/
 │   └── mocks.dart                    # Mock classes and test helpers
 ├── presentation/                     # ViewModel tests
-│   ├── capture/
-│   │   └── capture_vm_test.dart
+│   ├── source_selector_dialog/
+│   │   └── source_selector_dialog_vm_test.dart
 │   ├── detail/
 │   │   └── detail_vm_test.dart
 │   ├── home/
 │   │   └── home_vm_test.dart
 │   ├── processing/
 │   │   └── processing_vm_test.dart
-│   └── result/
-│       └── result_vm_test.dart
 ├── services/                         # Service tests
 │   ├── image_picker_service_test.dart
 │   ├── image_processing_service_test.dart
@@ -55,9 +53,8 @@ open coverage/html/index.html
 
 ### ViewModels (Unit Tests)
 - ✅ **HomeVM**: History loading, deletion, navigation, PDF opening
-- ✅ **CaptureVM**: Image capture from camera/gallery, source selection
+- ✅ **SourceSelectorDialogVM**: Image capture from camera/gallery, source selection
 - ✅ **ProcessingVM**: Image processing flow, face/document detection, saving
-- ✅ **ResultVM**: Image loading, navigation, PDF opening
 - ✅ **DetailVM**: Image loading, deletion, PDF opening
 
 ### Services (Unit Tests)

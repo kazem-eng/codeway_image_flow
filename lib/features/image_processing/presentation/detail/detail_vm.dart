@@ -10,6 +10,7 @@ import 'package:codeway_image_processing/features/image_processing/data/reposito
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_model.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
 
@@ -137,12 +138,39 @@ class DetailVM {
     if (entity == null) return;
     try {
       await _deleteEntityAndFiles(entity);
+      await _removeFromFaceGroup(entity);
       _toastService.show(AppStrings.itemDeleted, type: ToastType.warning);
       _navigationService.goBack();
     } catch (e) {
       _toastService.show(AppStrings.failedToDeleteItem, type: ToastType.error);
       _navigationService.goBack();
     }
+  }
+
+  Future<void> _removeFromFaceGroup(ProcessedImage entity) async {
+    final groupId = FaceBatchMetadata.groupIdFromItem(entity.metadata);
+    if (groupId == null) return;
+    await _repository.init();
+    final group = await _repository.getById(groupId);
+    if (group == null) return;
+    final ids = FaceBatchMetadata.parseGroup(group.metadata);
+    ids.remove(entity.id);
+    if (ids.isEmpty) {
+      await _fileStorageService.deleteProcessedImageFiles(group);
+      await _repository.delete(group.id);
+      return;
+    }
+    final updated = ProcessedImage(
+      id: group.id,
+      processingType: group.processingType,
+      originalPath: group.originalPath,
+      processedPath: group.processedPath,
+      thumbnailPath: group.thumbnailPath,
+      fileSize: group.fileSize,
+      createdAt: group.createdAt,
+      metadata: FaceBatchMetadata.group(ids),
+    );
+    await _repository.add(updated);
   }
 
   Future<void> openPdf() async {

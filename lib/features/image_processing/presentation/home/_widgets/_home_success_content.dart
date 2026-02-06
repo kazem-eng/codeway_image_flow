@@ -6,6 +6,7 @@ import 'package:codeway_image_processing/ui_kit/components/dialog_helpers.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/theme_data.dart';
 import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -26,31 +27,58 @@ class HomeSuccessContent extends StatelessWidget {
       final vm = BaseViewModel.of<HomeVM>();
       final history = vm.model.history;
       if (history.isEmpty) return const EmptyState();
-      return ListView.builder(
-        padding: EdgeInsets.only(
-          left: ImageFlowSpacing.md,
-          right: ImageFlowSpacing.md,
-          top: ImageFlowSpacing.sm,
-          bottom: 80,
-        ),
-        itemCount: history.length,
-        itemBuilder: (context, index) {
-          final image = history[index];
-          final dateStr = DateFormats.formatDateWithTime(image.createdAt);
-          final isFace = image.processingType.isFace;
-          final title = isFace
-              ? AppStrings.faceResultScreenTitle
-              : (image.metadata ?? AppStrings.pdfDocument);
-          return HistoryItem(
-            image: image,
-            thumbnailBytes: null,
-            title: title,
-            subtitle: dateStr,
-            onTap: () =>
-                isFace ? vm.navigateToDetail(image) : vm.openPdf(image),
-            onDelete: () => showDeleteConfirm(vm, image.id),
-          );
-        },
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsetsGeometry.only(
+              left: ImageFlowSpacing.md,
+              top: MediaQuery.paddingOf(context).top + ImageFlowSpacing.md,
+              bottom: ImageFlowSpacing.md,
+            ),
+            child: Text(
+              AppStrings.homeScreenTitle,
+              style: ImageFlowTextStyles.appTitle,
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.only(
+                left: ImageFlowSpacing.md,
+                right: ImageFlowSpacing.md,
+                top: ImageFlowSpacing.sm,
+                bottom: 80,
+              ),
+              itemCount: history.length,
+              itemBuilder: (context, index) {
+                final image = history[index];
+                final dateStr = DateFormats.formatDateWithTime(image.createdAt);
+                final isFace = image.processingType.isFace;
+                final isFaceBatch = image.processingType.isFaceBatch;
+                final batchCount = FaceBatchMetadata.parseGroup(
+                  image.metadata,
+                ).length;
+                final title = isFaceBatch
+                    ? '${AppStrings.facesLabel} ($batchCount)'
+                    : (isFace
+                          ? AppStrings.faceResultScreenTitle
+                          : (image.metadata ?? AppStrings.pdfDocument));
+                return HistoryItem(
+                  image: image,
+                  thumbnailBytes: null,
+                  title: title,
+                  subtitle: dateStr,
+                  onTap: () => isFaceBatch
+                      ? vm.openFaceGroup(image)
+                      : (isFace
+                            ? vm.navigateToDetail(image)
+                            : vm.openPdf(image)),
+                  onDelete: () => showDeleteConfirm(vm, image.id),
+                );
+              },
+            ),
+          ),
+        ],
       );
     });
   }

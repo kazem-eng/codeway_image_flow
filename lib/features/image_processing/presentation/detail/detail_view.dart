@@ -5,6 +5,7 @@ import 'package:codeway_image_processing/setup/locator.dart';
 import 'package:codeway_image_processing/ui_kit/components/imageflow_components_export.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/colors_model.dart';
+import 'package:codeway_image_processing/ui_kit/styles/theme_data.dart';
 import 'package:flutter/material.dart';
 
 class DetailView extends StatelessWidget {
@@ -23,14 +24,17 @@ class DetailView extends StatelessWidget {
         appBar: ImageFlowAppBar(
           title: AppStrings.detailScreenTitle,
           actions: [
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline,
-                color: ImageFlowColors.error,
-              ),
-              onPressed: () => DialogHelpers.showDeleteConfirm(
-                context,
-                onConfirm: vm.deleteImage,
+            Padding(
+              padding: const EdgeInsets.only(right: ImageFlowSpacing.md),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: ImageFlowColors.error,
+                ),
+                onPressed: () => DialogHelpers.showDeleteConfirm(
+                  context,
+                  onConfirm: vm.deleteImage,
+                ),
               ),
             ),
           ],

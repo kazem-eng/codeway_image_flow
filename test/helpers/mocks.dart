@@ -11,7 +11,7 @@ import 'package:codeway_image_processing/base/services/toast_service/i_toast_ser
 import 'package:codeway_image_processing/features/image_processing/data/repositories/i_processed_image_repository.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/capture/capture_vm.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/source_selector_dialog/source_selector_dialog_vm.dart';
 
 // Export generated mocks - must be before @GenerateMocks
 export 'mocks.mocks.dart';
@@ -25,7 +25,7 @@ export 'mocks.mocks.dart';
   INavigationService,
   IToastService,
   IProcessedImageRepository,
-  CaptureVM,
+  SourceSelectorDialogVM,
 ])
 void main() {}
 
