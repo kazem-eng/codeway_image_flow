@@ -28,4 +28,22 @@ class DialogHelpers {
       ),
     );
   }
+
+  /// Shows a discard confirmation dialog. Returns true if user confirms.
+  static Future<bool> showDiscardConfirm(
+    BuildContext context, {
+    String title = AppStrings.discardChangesTitle,
+    String content = AppStrings.discardChangesContent,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => DiscardConfirmDialog(
+        title: title,
+        content: content,
+        onCancel: () => Navigator.of(ctx).pop(false),
+        onConfirm: () => Navigator.of(ctx).pop(true),
+      ),
+    );
+    return result ?? false;
+  }
 }

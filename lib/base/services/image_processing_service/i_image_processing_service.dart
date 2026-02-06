@@ -8,4 +8,8 @@ abstract class IImageProcessingService {
   Future<Uint8List> processDocument(Uint8List imageBytes);
   Future<ProcessingType> detectContentType(Uint8List imageBytes);
   Future<Uint8List> createPdfFromImage(Uint8List imageBytes, String title);
+  Future<Uint8List> createPdfFromImages(
+    List<Uint8List> imageBytes,
+    String title,
+  );
 }

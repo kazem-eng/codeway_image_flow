@@ -17,12 +17,15 @@ A Flutter application for image processing and analysis using Google ML Kit. The
 
 ## 📱 Features
 
-- **Face Detection & Processing**: Detect and process faces in images using Google ML Kit
-- **Document Processing**: Automatically detect and crop documents from images
+- **Face Detection & Processing**: Detect faces with ML Kit and apply grayscale filtering
+- **Document Processing**: Native document pipeline on iOS/Android with a Dart fallback
 - **PDF Generation**: Convert processed documents to PDF format
-- **Image History**: View and manage your processed images
-- **Before/After Comparison**: View original and processed images side-by-side
-- **Camera & Gallery Support**: Capture images from camera or select from gallery
+- **Batch Processing**: Select multiple images from gallery and process in a queue
+- **Multi-page Documents**: Reorder/delete pages before exporting a single PDF
+- **Mixed Review**: Review documents and faces in separate tabs before finalizing
+- **Image History**: View and manage processed items, including grouped face batches
+- **Before/After Comparison**: Quick visual comparison for face results
+- **Camera & Gallery Support**: Capture from camera or multi-select from gallery
 - **File Management**: Organize and delete processed images
 
 ## 🏗️ Architecture
@@ -70,6 +73,7 @@ lib/
 │   │   ├── base_view.dart      # Base view widget
 │   │   └── base_vm.dart        # Base ViewModel class
 │   └── services/               # Core services
+│       ├── file_open_service/       # File opening (PDF, images)
 │       ├── file_storage_service/    # File I/O operations
 │       ├── image_picker_service/    # Camera & gallery access
 │       ├── image_processing_service/# ML Kit integration
@@ -83,12 +87,15 @@ lib/
 │       │   └── repositories/   # Data repositories
 │       ├── domain/             # Domain layer
 │       │   └── entities/       # Business entities
+│       ├── utils/              # Shared feature utilities
 │       └── presentation/       # Presentation layer
-│           ├── capture/        # Image capture screen
 │           ├── detail/         # Image detail screen
+│           ├── document/       # Document builder (multi-page)
 │           ├── home/           # Home/history screen
-│           ├── processing/    # Processing screen
-│           └── result/         # Result display screen
+│           ├── mixed_review/   # Mixed review tabs (docs + faces)
+│           ├── processing/     # Processing screen
+│           ├── source_selector_dialog/ # Source selector dialog
+│           └── summary/        # Summary screen
 │
 ├── setup/                      # App setup & configuration
 │   └── locator.dart            # Dependency injection setup
@@ -97,7 +104,6 @@ lib/
     ├── components/             # UI widgets (buttons, dialogs, etc.)
     ├── strings/                # App strings/localization
     ├── styles/                 # Colors, decorations, text styles
-    ├── theme/                  # App theme configuration
     └── utils/                  # UI utilities (formatters, etc.)
 ```
 
@@ -211,6 +217,11 @@ void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
 - Navigation service abstracts Navigator API
 - Route arguments passed via props classes
 
+### Native + Dart Processing
+
+- Face detection/processing runs in Flutter via ML Kit.
+- Document processing uses native platform code on iOS/Android through a `MethodChannel`, with a Dart fallback.
+
 ### File Storage
 
 - Images stored in app documents directory
@@ -248,10 +259,11 @@ The project includes comprehensive unit tests for:
 
 **ViewModels:**
 - ✅ `HomeVM` - History loading, deletion, navigation, PDF operations
-- ✅ `CaptureVM` - Image capture from camera/gallery
 - ✅ `ProcessingVM` - Image processing flow, face/document detection
-- ✅ `ResultVM` - Result display, image loading, navigation
 - ✅ `DetailVM` - Detail view, image loading, deletion
+- ✅ `DocumentVM` - Multi-page document editing and export
+- ✅ `SummaryVM` - Summary view and face batch management
+- ✅ `SourceSelectorDialogVM` - Camera/gallery selection and batch launch
 
 **Services:**
 - ✅ `NavigationService` - Navigation methods and null-safety

@@ -15,6 +15,7 @@ void main() {
   late DetailVM detailVM;
   late MockIProcessedImageRepository mockRepository;
   late MockIFileStorageService mockFileStorageService;
+  late MockIFileOpenService mockFileOpenService;
   late MockINavigationService mockNavigationService;
   late MockIToastService mockToastService;
 
@@ -22,6 +23,7 @@ void main() {
     detailVM = DetailVM(
       repository: mockRepository,
       fileStorageService: mockFileStorageService,
+      fileOpenService: mockFileOpenService,
       navigationService: mockNavigationService,
     );
   }
@@ -31,6 +33,7 @@ void main() {
     Get.reset();
     mockRepository = MockIProcessedImageRepository();
     mockFileStorageService = MockIFileStorageService();
+    mockFileOpenService = MockIFileOpenService();
     mockNavigationService = MockINavigationService();
     mockToastService = MockIToastService();
 
@@ -183,7 +186,9 @@ void main() {
         ).called(1);
         verify(mockRepository.delete('test-id')).called(1);
         verify(mockNavigationService.goBack()).called(1);
-        verify(mockToastService.show(argThat(isA<String>()))).called(1);
+        verify(
+          mockToastService.show(argThat(isA<String>()), type: anyNamed('type')),
+        ).called(1);
       });
 
       test('should handle error when deletion fails', () async {
@@ -212,7 +217,12 @@ void main() {
         await detailVM.deleteImage();
 
         // Assert
-        verify(mockToastService.show(argThat(contains('Failed')))).called(1);
+        verify(
+          mockToastService.show(
+            argThat(contains('Failed')),
+            type: anyNamed('type'),
+          ),
+        ).called(1);
         verifyNever(mockRepository.delete(argThat(isA<String>())));
       });
     });
@@ -222,6 +232,7 @@ void main() {
         // Arrange
         reset(mockRepository);
         reset(mockFileStorageService);
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           id: 'test-id',
           type: ProcessingType.document,
@@ -234,20 +245,24 @@ void main() {
         when(
           mockFileStorageService.loadImage(anyString),
         ).thenAnswer((_) async => testBytes);
+        when(mockFileOpenService.open(anyString)).thenAnswer((_) async => {});
 
         createDetailVM();
         await detailVM.init('test-id');
+        await detailVM.loadImage();
 
         // Act
         await detailVM.openPdf();
 
-        // Note: OpenFilex.open is hard to mock, so we just verify it doesn't throw
+        // Assert
+        verify(mockFileOpenService.open(argThat(isA<String>()))).called(1);
       });
 
       test('should not open PDF for face type', () async {
         // Arrange
         reset(mockRepository);
         reset(mockFileStorageService);
+        reset(mockFileOpenService);
         final testImage = TestHelpers.createTestProcessedImage(
           id: 'test-id',
           type: ProcessingType.face,
@@ -268,6 +283,7 @@ void main() {
         await detailVM.openPdf();
 
         // Assert - should return early without opening
+        verifyNever(mockFileOpenService.open(argThat(isA<String>())));
       });
     });
   });

@@ -1,44 +1,64 @@
 import 'package:flutter/material.dart';
 
-import 'package:codeway_image_processing/ui_kit/styles/colors_model.dart';
-import 'package:codeway_image_processing/ui_kit/styles/theme_data.dart';
+import 'package:codeway_image_processing/ui_kit/components/imageflow_toast.dart';
+import 'package:codeway_image_processing/ui_kit/components/imageflow_toast_style.dart';
 
 import 'i_toast_service.dart';
 
-/// Shows toasts as SnackBars using the app navigator context.
+/// Shows toasts using an overlay with slide + fade animation.
 class ToastService implements IToastService {
   ToastService({required GlobalKey<NavigatorState> navigatorKey})
     : _navigatorKey = navigatorKey;
 
   final GlobalKey<NavigatorState> _navigatorKey;
+  OverlayEntry? _entry;
 
   @override
-  void show(String message) {
-    final context = _navigatorKey.currentContext;
-    if (context == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: ImageFlowTextStyles.bodyLarge),
-        backgroundColor: ImageFlowColors.secondary,
-        behavior: SnackBarBehavior.floating,
-        animation: CurvedAnimation(
-          parent: const AlwaysStoppedAnimation<double>(1.0),
-          curve: Curves.bounceIn,
-          reverseCurve: Curves.bounceOut,
+  void show(String message, {ToastType type = ToastType.info}) {
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
+    void insertToast() {
+      final overlay = navigator.overlay;
+      if (overlay == null) return;
+
+      _entry?.remove();
+      _entry = null;
+
+      late final OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (_) => ImageFlowToast(
+          message: message,
+          style: _mapStyle(type),
+          onDismissed: () {
+            if (_entry == entry) {
+              _entry?.remove();
+              _entry = null;
+            }
+          },
         ),
-        margin: const EdgeInsets.fromLTRB(
-          ImageFlowSpacing.md,
-          0,
-          ImageFlowSpacing.md,
-          ImageFlowSpacing.lg,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            ImageFlowSpacing.borderRadiusMedium,
-          ),
-        ),
-        duration: const Duration(milliseconds: 1500),
-      ),
-    );
+      );
+      _entry = entry;
+      overlay.insert(entry);
+    }
+
+    if (navigator.overlay == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => insertToast());
+    } else {
+      insertToast();
+    }
+  }
+
+  ImageFlowToastStyle _mapStyle(ToastType type) {
+    switch (type) {
+      case ToastType.success:
+        return ImageFlowToastStyle.success;
+      case ToastType.warning:
+        return ImageFlowToastStyle.warning;
+      case ToastType.error:
+        return ImageFlowToastStyle.error;
+      case ToastType.info:
+        return ImageFlowToastStyle.info;
+    }
   }
 }

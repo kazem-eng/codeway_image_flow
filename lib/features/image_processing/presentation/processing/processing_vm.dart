@@ -1,26 +1,25 @@
-import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:codeway_image_processing/base/base_exception.dart';
+import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
+
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
-import 'package:codeway_image_processing/base/services/file_storage_service/file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/image_processing_service/i_image_processing_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
-import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
 import 'package:codeway_image_processing/features/image_processing/data/repositories/i_processed_image_repository.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_step.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_model.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/result/result_props.dart';
-import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
-import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
-import 'package:get/get.dart';
-import 'package:uuid/uuid.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/mixed_review/mixed_review_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/utils/processed_image_saver.dart';
 
-/// Processing screen ViewModel. Props passed via [init] from view; call [startProcessing] after.
+/// Processing ViewModel.
 class ProcessingVM {
   ProcessingVM({
     required IImageProcessingService processingService,
@@ -28,310 +27,322 @@ class ProcessingVM {
     required IProcessedImageRepository repository,
     required INavigationService navigationService,
   }) : _processingService = processingService,
-       _fileStorageService = fileStorageService,
-       _repository = repository,
-       _navigationService = navigationService;
+       _navigationService = navigationService,
+       _imageSaver = ProcessedImageSaver(
+         fileStorageService: fileStorageService,
+         repository: repository,
+       );
 
   final IImageProcessingService _processingService;
-  final IFileStorageService _fileStorageService;
-  final IProcessedImageRepository _repository;
   final INavigationService _navigationService;
-  final IToastService _toastService = Get.find<IToastService>();
-
-  final _state = const BaseState<ProcessingModel>.loading().obs;
+  final ProcessedImageSaver _imageSaver;
+  final _state = const BaseState<ProcessingModel>.success(
+    ProcessingModel(),
+  ).obs;
   BaseState<ProcessingModel> get state => _state.value;
-
   ProcessingModel get model => _state.value.data ?? const ProcessingModel();
 
   final _uuid = const Uuid();
 
-  /// Call from view's [initViewModel] with props (e.g. vm.init(imageBytes); vm.startProcessing()).
-  /// Stores the image bytes in the model for reactive access.
-  void init(Uint8List? imageBytes) {
-    if (imageBytes != null) {
-      _state.value = BaseState.success(
-        ProcessingModel(originalImage: imageBytes),
-      );
-    }
+  void init(List<Uint8List> images) {
+    final items = images
+        .map(
+          (bytes) => ProcessingItem(
+            id: _uuid.v4(),
+            originalBytes: bytes,
+          ),
+        )
+        .toList();
+    _state.value = BaseState.success(ProcessingModel(items: items));
   }
 
-  /// Call from view's [initViewModel] after [init] (e.g. vm.init(imageBytes); vm.startProcessing()).
   Future<void> startProcessing() async {
-    final bytes = model.originalImage;
-    if (bytes != null) await processImage();
+    if (model.isProcessing || model.items.isEmpty) return;
+    _prepareProcessingState();
+
+    final batch = _ProcessingBatch(faceGroupId: _uuid.v4());
+    await _processItems(batch);
+    _markProcessingCompleted();
+
+    final faceGroupEntity = await _finalizeFaceGroup(batch);
+    await _routeToOutcome(
+      docCount: batch.docCount,
+      faceCount: batch.faceCount,
+      documentPages: batch.documentPages,
+      faceResults: batch.faceResults,
+      documentResults: const <SummaryDocumentPreview>[],
+      faceGroupEntity: faceGroupEntity,
+    );
   }
 
-  Future<void> processImage() async {
-    final imageBytes = model.originalImage;
-    if (imageBytes == null) return;
-
+  void _prepareProcessingState() {
     _state.value = BaseState.success(
       model.copyWith(
+        isProcessing: true,
+        isCompleted: false,
+        completedCount: 0,
+        currentIndex: 0,
         processingStep: ProcessingStep.detectingContent,
-        progress: 0.2,
       ),
     );
+  }
 
-    final type = await _processingService.detectContentType(imageBytes);
-    final current = _state.value.data!;
-    final isFace = type.isFace;
-    _state.value = BaseState.success(
-      current.copyWith(
-        processingType: type,
-        processingStep: isFace
-            ? ProcessingStep.detectingFaces
-            : ProcessingStep.detectingDocument,
-        progress: 0.3,
-      ),
-    );
-
-    if (isFace) {
-      await _processFace(imageBytes);
-    } else {
-      await _processDocument(imageBytes);
+  Future<void> _processItems(_ProcessingBatch batch) async {
+    for (var i = 0; i < model.items.length; i++) {
+      try {
+        await _processItem(i, batch);
+      } catch (e) {
+        _updateItem(
+          i,
+          status: ProcessingItemStatus.failed,
+          errorMessage: e.toString(),
+        );
+      }
+      _incrementCompleted();
     }
   }
 
-  Future<void> _processFace(Uint8List imageBytes) async {
-    final current = _state.value.data!;
-    _state.value = BaseState.success(
-      current.copyWith(
-        processingStep: ProcessingStep.detectingFaces,
-        progress: 0.3,
-      ),
-    );
-    Uint8List processed;
-    try {
-      processed = await _processingService.detectAndProcessFaces(imageBytes);
-    } catch (e) {
-      _toastService.show(AppStrings.noFacesDetected);
-      // Preserve model state (original image) for retry
-      final currentData = _state.value.data;
-      _state.value = BaseState.error(
-        exception: FaceDetectionException(message: e.toString()),
-        data: currentData,
-      );
-      _navigationService.goBack();
+  Future<void> _processItem(int index, _ProcessingBatch batch) async {
+    _setCurrentIndex(index);
+    _setProcessingStep(ProcessingStep.detectingContent);
+    _updateItemStatus(index, ProcessingItemStatus.processing);
+
+    final originalBytes = model.items[index].originalBytes;
+    final type = await _processingService.detectContentType(originalBytes);
+    _updateItem(index, type: type);
+
+    if (type.isFace) {
+      await _processFaceItem(index, originalBytes, batch);
       return;
     }
-    final data = _state.value.data!;
-    _state.value = BaseState.success(
-      data.copyWith(processingStep: ProcessingStep.saving, progress: 0.8),
+    await _processDocumentItem(index, originalBytes, batch);
+  }
+
+  Future<void> _processFaceItem(
+    int index,
+    Uint8List originalBytes,
+    _ProcessingBatch batch,
+  ) async {
+    _setProcessingStep(ProcessingStep.detectingFaces);
+    final processed = await _processingService.detectAndProcessFaces(
+      originalBytes,
     );
-    await _saveResult(
-      originalBytes: imageBytes,
+    _setProcessingStep(ProcessingStep.saving);
+    final entity = await _imageSaver.save(
+      originalBytes: originalBytes,
       processedBytes: processed,
       type: ProcessingType.face,
       isPdf: false,
-      documentTitle: AppStrings.facesProcessed,
+      metadata: FaceBatchMetadata.item(batch.faceGroupId),
     );
-  }
-
-  Future<void> _processDocument(Uint8List imageBytes) async {
-    final current = _state.value.data!;
-    _state.value = BaseState.success(
-      current.copyWith(
-        processingStep: ProcessingStep.processingDocument,
-        progress: 0.4,
+    batch.faceCount += 1;
+    batch.faceEntities.add(entity);
+    batch.faceResults.add(
+      SummaryFacePreview(
+        image: entity,
+        originalBytes: originalBytes,
+        processedBytes: processed,
       ),
     );
-
-    // Process document - will crop if detected, or use full image
-    final processedImage = await _processingService.processDocument(imageBytes);
-
-    final data = _state.value.data!;
-    _state.value = BaseState.success(
-      data.copyWith(processingStep: ProcessingStep.creatingPdf, progress: 0.6),
-    );
-
-    final title =
-        '${AppStrings.documentPrefix} ${DateFormats.formatCurrentIsoDate()}';
-    final pdfBytes = await _processingService.createPdfFromImage(
-      processedImage,
-      title,
-    );
-
-    final data2 = _state.value.data!;
-    _state.value = BaseState.success(
-      data2.copyWith(processingStep: ProcessingStep.saving, progress: 0.8),
-    );
-
-    await _saveResult(
-      originalBytes: imageBytes,
-      processedBytes: pdfBytes,
-      type: ProcessingType.document,
-      isPdf: true,
-      documentTitle: title,
+    _updateItem(
+      index,
+      status: ProcessingItemStatus.success,
+      type: ProcessingType.face,
+      result: entity,
+      errorMessage: null,
     );
   }
 
-  Future<void> _saveResult({
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-    String? documentTitle,
-  }) async {
-    try {
-      final id = _uuid.v4();
-      final savedFiles = await _saveFiles(
-        id: id,
+  Future<void> _processDocumentItem(
+    int index,
+    Uint8List originalBytes,
+    _ProcessingBatch batch,
+  ) async {
+    _setProcessingStep(ProcessingStep.processingDocument);
+    final processed = await _processingService.processDocument(
+      originalBytes,
+    );
+    batch.docCount += 1;
+    batch.documentPages.add(
+      DocumentSeedPage(
         originalBytes: originalBytes,
-        processedBytes: processedBytes,
-        type: type,
-        isPdf: isPdf,
-      );
-      final entity = _createProcessedImageEntity(
-        id: id,
-        type: type,
-        savedFiles: savedFiles,
-        processedBytes: processedBytes,
-        documentTitle: documentTitle,
-      );
-      await _persistEntity(entity);
-      _updateStateToComplete();
-      // Go back to home first, then navigate to result from home
-      await _navigateToResultViaHome(entity);
-    } catch (e) {
-      _handleSaveError(e);
-    }
-  }
-
-  /// Saves all files (original, processed, thumbnail) and returns their paths.
-  /// Implements rollback: if any file save fails, deletes already-saved files.
-  Future<_SavedFiles> _saveFiles({
-    required String id,
-    required Uint8List originalBytes,
-    required Uint8List processedBytes,
-    required ProcessingType type,
-    required bool isPdf,
-  }) async {
-    final directory = type.isFace
-        ? FileStorageService.facesDir
-        : FileStorageService.documentsDir;
-
-    String? originalPath;
-    String? processedPath;
-    String? thumbnailPath;
-
-    try {
-      originalPath = await _fileStorageService.saveProcessedImage(
-        originalBytes,
-        '$directory/${id}_original.jpg',
-      );
-
-      processedPath = isPdf
-          ? await _fileStorageService.savePdf(
-              processedBytes,
-              '$directory/${id}_processed.pdf',
-            )
-          : await _fileStorageService.saveProcessedImage(
-              processedBytes,
-              '$directory/${id}_processed.jpg',
-            );
-
-      thumbnailPath = await _fileStorageService.saveThumbnail(
-        originalBytes,
-        '${id}_thumb.jpg',
-      );
-
-      return _SavedFiles(
-        originalPath: originalPath,
-        processedPath: processedPath,
-        thumbnailPath: thumbnailPath,
-      );
-    } catch (e) {
-      // Rollback: delete any successfully saved files
-      if (originalPath != null) {
-        try {
-          await _fileStorageService.deleteFile(originalPath);
-        } catch (_) {
-          // Ignore rollback errors
-        }
-      }
-      if (processedPath != null) {
-        try {
-          await _fileStorageService.deleteFile(processedPath);
-        } catch (_) {
-          // Ignore rollback errors
-        }
-      }
-      if (thumbnailPath != null) {
-        try {
-          await _fileStorageService.deleteFile(thumbnailPath);
-        } catch (_) {
-          // Ignore rollback errors
-        }
-      }
-      rethrow;
-    }
-  }
-
-  /// Creates a ProcessedImage entity from saved files and metadata.
-  ProcessedImage _createProcessedImageEntity({
-    required String id,
-    required ProcessingType type,
-    required _SavedFiles savedFiles,
-    required Uint8List processedBytes,
-    String? documentTitle,
-  }) {
-    return ProcessedImage(
-      id: id,
-      processingType: type,
-      originalPath: savedFiles.originalPath,
-      processedPath: savedFiles.processedPath,
-      thumbnailPath: savedFiles.thumbnailPath,
-      fileSize: processedBytes.length,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
-      metadata: documentTitle,
+        processedBytes: processed,
+      ),
+    );
+    _updateItem(
+      index,
+      status: ProcessingItemStatus.success,
+      type: ProcessingType.document,
+      result: null,
+      errorMessage: null,
     );
   }
 
-  /// Persists the entity to the repository.
-  Future<void> _persistEntity(ProcessedImage entity) async {
-    await _repository.init();
-    await _repository.add(entity);
-  }
-
-  /// Updates state to indicate processing is complete.
-  void _updateStateToComplete() {
-    final data = _state.value.data!;
+  void _markProcessingCompleted() {
     _state.value = BaseState.success(
-      data.copyWith(progress: 1.0, processingStep: ProcessingStep.done),
+      model.copyWith(
+        isProcessing: false,
+        isCompleted: true,
+        currentIndex: -1,
+        processingStep: ProcessingStep.done,
+      ),
     );
   }
 
-  /// Navigates to the result screen via home to ensure proper navigation context.
-  Future<void> _navigateToResultViaHome(ProcessedImage entity) async {
-    // Go back to home screen first
-    _navigationService.goBack();
-    // Small delay to ensure home screen is ready and rendered
-    await Future.delayed(const Duration(milliseconds: 200));
-    // Then navigate to result screen from home
-    await _navigationService.goTo(
-      Routes.result,
-      arguments: ResultProps(processedImage: entity),
+  Future<ProcessedImage?> _finalizeFaceGroup(_ProcessingBatch batch) async {
+    if (batch.faceEntities.length > 1) {
+      return _saveFaceGroupEntity(
+        groupId: batch.faceGroupId,
+        faces: batch.faceEntities,
+      );
+    }
+    await _stripFaceBatchMetadataIfSingle(
+      batch.faceEntities,
+      batch.faceResults,
+    );
+    return null;
+  }
+
+  void _setCurrentIndex(int index) {
+    _state.value = BaseState.success(model.copyWith(currentIndex: index));
+  }
+
+  void _setProcessingStep(ProcessingStep step) {
+    _state.value = BaseState.success(model.copyWith(processingStep: step));
+  }
+
+  void _incrementCompleted() {
+    _state.value = BaseState.success(
+      model.copyWith(completedCount: model.completedCount + 1),
     );
   }
 
-  /// Handles errors during the save operation.
-  void _handleSaveError(Object error) {
-    _state.value = BaseState.error(
-      exception: StorageException(message: error.toString()),
+  void _updateItemStatus(int index, ProcessingItemStatus status) {
+    _updateItem(index, status: status);
+  }
+
+  void _updateItem(
+    int index, {
+    ProcessingItemStatus? status,
+    ProcessingType? type,
+    ProcessedImage? result,
+    String? errorMessage,
+  }) {
+    if (index < 0 || index >= model.items.length) return;
+    final items = List<ProcessingItem>.from(model.items);
+    items[index] = items[index].copyWith(
+      status: status,
+      type: type,
+      result: result,
+      errorMessage: errorMessage,
     );
-    _toastService.show(AppStrings.failedToSaveImagePdf);
+    _state.value = BaseState.success(model.copyWith(items: items));
+  }
+
+  Future<void> _routeToOutcome({
+    required int docCount,
+    required int faceCount,
+    required List<DocumentSeedPage> documentPages,
+    required List<SummaryFacePreview> faceResults,
+    required List<SummaryDocumentPreview> documentResults,
+    required ProcessedImage? faceGroupEntity,
+  }) async {
+    final shouldUseDocumentFlow =
+        documentPages.isNotEmpty && faceCount == 0 && docCount > 0;
+    final shouldUseMixedReview =
+        documentPages.isNotEmpty && faceCount > 0 && docCount > 0;
+
+    if (shouldUseDocumentFlow) {
+      await _navigationService.replaceWith(
+        Routes.multiPage,
+        arguments: DocumentProps(pages: documentPages),
+      );
+      return;
+    }
+
+    if (shouldUseMixedReview) {
+      await _navigationService.replaceWith(
+        Routes.mixedReview,
+        arguments: MixedReviewProps(
+          pages: documentPages,
+          faces: faceResults,
+          faceGroupId: faceGroupEntity?.id,
+          faceGroupEntity: faceGroupEntity,
+        ),
+      );
+      return;
+    }
+
+    await _navigationService.replaceWith(
+      Routes.summary,
+      arguments: SummaryProps(
+        documents: documentResults,
+        faces: faceResults,
+        faceGroupEntity: faceGroupEntity,
+      ),
+    );
+  }
+
+  Future<ProcessedImage> _saveFaceGroupEntity({
+    required String groupId,
+    required List<ProcessedImage> faces,
+  }) async {
+    final first = faces.first;
+    final totalSize =
+        faces.fold<int>(0, (sum, item) => sum + (item.fileSize ?? 0));
+    final entity = ProcessedImage(
+      id: groupId,
+      processingType: ProcessingType.faceBatch,
+      originalPath: first.originalPath,
+      processedPath: first.processedPath,
+      thumbnailPath: first.thumbnailPath,
+      fileSize: totalSize,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      metadata: FaceBatchMetadata.group(
+        faces.map((f) => f.id).toList(),
+      ),
+    );
+    await _imageSaver.persist(entity);
+    return entity;
+  }
+
+  Future<void> _stripFaceBatchMetadataIfSingle(
+    List<ProcessedImage> faceEntities,
+    List<SummaryFacePreview> faceResults,
+  ) async {
+    if (faceEntities.length != 1) return;
+    final single = faceEntities.first;
+    if (!FaceBatchMetadata.isBatchItem(single.metadata)) return;
+    final updated = ProcessedImage(
+      id: single.id,
+      processingType: single.processingType,
+      originalPath: single.originalPath,
+      processedPath: single.processedPath,
+      thumbnailPath: single.thumbnailPath,
+      fileSize: single.fileSize,
+      createdAt: single.createdAt,
+      metadata: null,
+    );
+    await _imageSaver.persist(updated);
+    faceEntities[0] = updated;
+    if (faceResults.isNotEmpty) {
+      final preview = faceResults.first;
+      faceResults[0] = SummaryFacePreview(
+        image: updated,
+        originalBytes: preview.originalBytes,
+        processedBytes: preview.processedBytes,
+      );
+    }
   }
 }
 
-/// Holds paths of saved files for a processed image.
-class _SavedFiles {
-  const _SavedFiles({
-    required this.originalPath,
-    required this.processedPath,
-    required this.thumbnailPath,
-  });
+class _ProcessingBatch {
+  _ProcessingBatch({required this.faceGroupId});
 
-  final String originalPath;
-  final String processedPath;
-  final String thumbnailPath;
+  final String faceGroupId;
+  final List<DocumentSeedPage> documentPages = [];
+  final List<SummaryFacePreview> faceResults = [];
+  final List<ProcessedImage> faceEntities = [];
+  int docCount = 0;
+  int faceCount = 0;
 }

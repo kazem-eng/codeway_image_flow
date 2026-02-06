@@ -20,7 +20,10 @@ class SourceChoiceDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = Padding(
       padding: ImageFlowSpacing.screenPadding,
-      child: SourceSelector(onCamera: onCamera, onGallery: onGallery),
+      child: SourceSelector(
+        onCamera: onCamera,
+        onGallery: onGallery,
+      ),
     );
     return Dialog(
       backgroundColor: ImageFlowColors.surface,

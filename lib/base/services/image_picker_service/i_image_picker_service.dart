@@ -11,4 +11,8 @@ abstract class IImagePickerService {
     required ImageSource source,
     int imageQuality = 85,
   });
+
+  /// Picks multiple images from gallery.
+  /// Returns an empty list if cancelled.
+  Future<List<Uint8List>> pickMultiImages({int imageQuality = 85});
 }

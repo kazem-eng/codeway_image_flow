@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_view.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_view.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/mixed_review/mixed_review_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/mixed_review/mixed_review_view.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/document/document_view.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/processing/processing_view.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/result/result_props.dart';
-import 'package:codeway_image_processing/features/image_processing/presentation/result/result_view.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_view.dart';
 import 'routes.dart';
 
 /// Routes handler. Views receive props as parameters; VMs are created inside each view via [BaseView].
@@ -19,21 +23,40 @@ class RoutesHandler {
           builder: (_) => const HomeView(),
         );
       case Routes.processing:
-        final props = settings.arguments is ProcessingProps
-            ? settings.arguments as ProcessingProps
-            : null;
-        return MaterialPageRoute<void>(
-          settings: settings,
-          builder: (_) => ProcessingView(imageBytes: props?.imageBytes),
-        );
-      case Routes.result:
-        final resultArgs = settings.arguments;
-        if (resultArgs is! ResultProps) {
+        final props = settings.arguments;
+        if (props is! ProcessingProps) {
           return _createRedirectRoute(Routes.home);
         }
         return MaterialPageRoute<void>(
           settings: settings,
-          builder: (_) => ResultView(processedImage: resultArgs.processedImage),
+          builder: (_) => ProcessingView(props: props),
+        );
+      case Routes.multiPage:
+        final props = settings.arguments;
+        if (props is! DocumentProps) {
+          return _createRedirectRoute(Routes.home);
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => DocumentView(props: props),
+        );
+      case Routes.summary:
+        final props = settings.arguments;
+        if (props is! SummaryProps) {
+          return _createRedirectRoute(Routes.home);
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => SummaryView(props: props),
+        );
+      case Routes.mixedReview:
+        final props = settings.arguments;
+        if (props is! MixedReviewProps) {
+          return _createRedirectRoute(Routes.home);
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => MixedReviewView(props: props),
         );
       case Routes.detail:
         final detailArgs = settings.arguments;

@@ -18,6 +18,15 @@ class NavigationService implements INavigationService {
   }
 
   @override
+  Future<void> replaceWith(String route, {Object? arguments}) async {
+    if (_context == null) return;
+    await Navigator.of(_context!).pushReplacementNamed(
+      route,
+      arguments: arguments,
+    );
+  }
+
+  @override
   void goBack() {
     if (_context == null) return;
     Navigator.of(_context!).pop();

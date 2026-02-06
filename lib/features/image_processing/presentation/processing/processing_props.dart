@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-/// Arguments for processing screen.
+/// Arguments for processing.
 class ProcessingProps {
-  const ProcessingProps({required this.imageBytes});
+  const ProcessingProps({required this.images});
 
-  final Uint8List imageBytes;
+  final List<Uint8List> images;
 }
