@@ -78,36 +78,39 @@ lib/
 │
 ├── base/                       # Base classes and utilities
 │   ├── base_exception.dart     # Base exception classes
-│   ├── database_helper.dart    # SQLite database helper
 │   ├── mvvm_base/              # MVVM base classes
 │   │   ├── base.dart           # Base exports
 │   │   ├── base_state.dart     # State wrapper (loading/success/error)
 │   │   ├── base_view.dart      # Base view widget
 │   │   └── base_vm.dart        # Base ViewModel class
 │   └── services/               # Core services
+│       ├── database_service/        # SQLite database
 │       ├── file_open_service/       # File opening (PDF, images)
 │       ├── file_storage_service/    # File I/O operations
 │       ├── image_picker_service/    # Camera & gallery access
-│       ├── image_processing_service/# ML Kit integration
-│       ├── navigation_service/     # App navigation
+│       ├── image_processing_service/# ML Kit & document/PDF processing
+│       ├── method_channel_service/  # Platform channel (document, PDF)
+│       ├── navigation_service/      # App navigation
 │       └── toast_service/          # User notifications
 │
 ├── features/                   # Feature modules
 │   └── image_processing/
 │       ├── data/               # Data layer
 │       │   ├── models/         # Data models (DB mapping)
-│       │   └── repositories/   # Data repositories
+│       │   ├── repositories/   # Data repositories
+│       │   └── services/       # Data services (e.g. save orchestration)
 │       ├── domain/             # Domain layer
-│       │   └── entities/       # Business entities
-│       ├── utils/              # Shared feature utilities
-│       └── presentation/       # Presentation layer
+│       │   ├── entities/       # Business entities
+│       │   └── utils/          # Domain helpers (e.g. batch metadata)
+│       └── presentation/      # Presentation layer
 │           ├── detail/         # Image detail screen
 │           ├── document/       # Document builder (multi-page)
 │           ├── home/           # Home/history screen
 │           ├── mixed_review/   # Mixed review tabs (docs + faces)
 │           ├── processing/     # Processing screen
 │           ├── source_selector_dialog/ # Source selector dialog
-│           └── summary/        # Summary screen
+│           ├── summary/        # Summary screen
+│           └── utils/          # Presentation helpers (e.g. display formatting)
 │
 ├── setup/                      # App setup & configuration
 │   └── locator.dart            # Dependency injection setup
@@ -116,6 +119,7 @@ lib/
     ├── components/             # UI widgets (buttons, dialogs, etc.)
     ├── strings/                # App strings/localization
     ├── styles/                 # Colors, decorations, text styles
+    ├── theme/                  # Theme provider
     └── utils/                  # UI utilities (formatters, etc.)
 ```
 
@@ -217,16 +221,7 @@ The app uses a custom `BaseState` wrapper with three states:
 
 ### Dependency Injection
 
-Services are registered in `setup/locator.dart` using GetX service locator pattern:
-
-```dart
-void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
-  // Register services
-  Get.put<INavigationService>(NavigationService(navigatorKey: navigatorKey));
-  Get.put<IFileStorageService>(FileStorageService());
-  // ... more services
-}
-```
+Services are registered in `setup/locator.dart` using GetX service locator pattern. ViewModels are created per-route via factory functions.
 
 ### Navigation
 
@@ -237,7 +232,7 @@ void setupLocator({required GlobalKey<NavigatorState> navigatorKey}) {
 ### Native + Dart Processing
 
 - Face detection/processing runs in Flutter via ML Kit.
-- Document processing uses native platform code on iOS/Android through a `MethodChannel`, with a Dart fallback.
+- Document processing uses native platform code on iOS/Android through the method channel service, with a Dart fallback.
 
 ### File Storage
 
