@@ -4,7 +4,6 @@ import 'package:codeway_image_processing/features/image_processing/domain/entiti
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_step.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 
-/// Processing state model.
 class ProcessingModel {
   const ProcessingModel({
     this.items = const [],

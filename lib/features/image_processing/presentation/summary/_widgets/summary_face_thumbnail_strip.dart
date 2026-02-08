@@ -33,7 +33,6 @@ class SummaryFaceThumbnailStrip extends StatelessWidget {
             onTap: () => onSelect(index),
             child: Stack(
               children: [
-                // Thumbnail with border highlight if selected
                 Container(
                   decoration: ImageFlowDecorations.card(
                     border: Border.all(
@@ -52,8 +51,6 @@ class SummaryFaceThumbnailStrip extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // Delete button at top-right corner
                 Positioned(
                   top: ImageFlowSizes.thumbnailDeleteOffset,
                   right: ImageFlowSizes.thumbnailDeleteOffset,

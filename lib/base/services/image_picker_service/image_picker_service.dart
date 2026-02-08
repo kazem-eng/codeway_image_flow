@@ -13,7 +13,7 @@ class ImagePickerService implements IImagePickerService {
   @override
   Future<Uint8List?> pickImage({
     required ImageSource source,
-    int imageQuality = 85,
+    int imageQuality = IImagePickerService.defaultImageQuality,
   }) async {
     final xFile = await _picker.pickImage(
       source: source,
@@ -24,7 +24,9 @@ class ImagePickerService implements IImagePickerService {
   }
 
   @override
-  Future<List<Uint8List>> pickMultiImages({int imageQuality = 85}) async {
+  Future<List<Uint8List>> pickMultiImages({
+    int imageQuality = IImagePickerService.defaultImageQuality,
+  }) async {
     final files = await _picker.pickMultiImage(imageQuality: imageQuality);
     if (files.isEmpty) return <Uint8List>[];
     final results = <Uint8List>[];

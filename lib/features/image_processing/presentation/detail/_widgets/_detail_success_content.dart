@@ -19,15 +19,12 @@ class DetailSuccessContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = BaseViewModel.of<DetailVM>();
     final image = data.image;
-
-    // If image is null, show error widget.
     if (image == null) {
       return ImageFlowErrorWidget(message: AppStrings.itemNotFound);
     }
 
     final original = data.originalBytes;
     final processed = data.processedBytes;
-    // If original image bytes are null, show loader.
     if (original == null) {
       return const ImageFlowLoader();
     }

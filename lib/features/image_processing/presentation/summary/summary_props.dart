@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 
-/// Summary arguments.
 class SummaryProps {
   const SummaryProps({
     required this.faces,

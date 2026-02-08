@@ -97,6 +97,8 @@ class ProcessedImageSaver {
         thumbnailPath: thumbnailPath,
       );
     } catch (e) {
+      // Best-effort cleanup: remove any files we already wrote so we don't leave orphans.
+      // Ignore delete failures; caller should see the original save error (rethrow below).
       if (originalPath != null) {
         try {
           await _fileStorageService.deleteFile(originalPath);

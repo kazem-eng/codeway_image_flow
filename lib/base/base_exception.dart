@@ -18,19 +18,9 @@ class FaceDetectionException extends BaseException {
     : super(prefix: 'Face Detection Error: ');
 }
 
-class DocumentDetectionException extends BaseException {
-  DocumentDetectionException({required super.message})
-    : super(prefix: 'Document Detection Error: ');
-}
-
 class ImageProcessingException extends BaseException {
   ImageProcessingException({required super.message})
     : super(prefix: 'Image Processing Error: ');
-}
-
-class PermissionException extends BaseException {
-  PermissionException({required super.message})
-    : super(prefix: 'Permission Error: ');
 }
 
 class FileStorageException extends BaseException {

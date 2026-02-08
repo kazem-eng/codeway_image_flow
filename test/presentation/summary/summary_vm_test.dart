@@ -7,9 +7,9 @@ import 'package:mockito/mockito.dart';
 import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/utils/face_batch_metadata.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_vm.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
 
 import '../../helpers/mocks.dart';
 

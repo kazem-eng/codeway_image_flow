@@ -11,7 +11,6 @@ import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// ViewModel for the source selector dialog.
 class SourceSelectorDialogVM {
   SourceSelectorDialogVM({
     required INavigationService navigationService,
@@ -39,10 +38,7 @@ class SourceSelectorDialogVM {
 
   Future<void> captureFromCamera() async {
     await selectSource(ImageSource.camera);
-    await _captureSingleImage(
-      ImageSource.camera,
-      showErrorToast: true,
-    );
+    await _captureSingleImage(ImageSource.camera, showErrorToast: true);
   }
 
   Future<void> captureFromGallery() async {
@@ -60,10 +56,7 @@ class SourceSelectorDialogVM {
   }
 
   Future<void> captureImage() async {
-    await _captureSingleImage(
-      ImageSource.camera,
-      showErrorToast: false,
-    );
+    await _captureSingleImage(ImageSource.camera, showErrorToast: false);
   }
 
   Future<void> pickFromGallery() async {
@@ -122,10 +115,7 @@ class SourceSelectorDialogVM {
     required bool showErrorToast,
   }) async {
     await _runProcessing(() async {
-      final bytes = await _imagePickerService.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
+      final bytes = await _imagePickerService.pickImage(source: source);
       if (bytes == null) return;
       _setCapturedImage(bytes);
       await processImage(bytes);
@@ -137,9 +127,7 @@ class SourceSelectorDialogVM {
     bool updateCapturedImage = false,
   }) async {
     await _runProcessing(() async {
-      final images = await _imagePickerService.pickMultiImages(
-        imageQuality: 85,
-      );
+      final images = await _imagePickerService.pickMultiImages();
       if (images.isEmpty) return;
       if (updateCapturedImage) {
         _setCapturedImage(images.first);

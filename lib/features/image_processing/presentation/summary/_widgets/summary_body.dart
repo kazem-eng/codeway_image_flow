@@ -11,7 +11,6 @@ import 'package:codeway_image_processing/ui_kit/components/imageflow_loader.dart
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
-/// Summary screen body.
 class SummaryBody extends StatelessWidget {
   const SummaryBody({super.key});
 

@@ -16,8 +16,8 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/mixed_review/mixed_review_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/processed_image_saver.dart';
+import 'package:codeway_image_processing/features/image_processing/data/services/processed_image_saver.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/utils/face_batch_metadata.dart';
 
 /// Processing ViewModel.
 class ProcessingVM {

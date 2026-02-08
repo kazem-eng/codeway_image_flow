@@ -5,18 +5,18 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:codeway_image_processing/base/mvvm_base/base_state.dart';
-import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/file_open_service/i_file_open_service.dart';
+import 'package:codeway_image_processing/base/services/file_storage_service/i_file_storage_service.dart';
 import 'package:codeway_image_processing/base/services/image_picker_service/i_image_picker_service.dart';
 import 'package:codeway_image_processing/base/services/image_processing_service/i_image_processing_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/i_navigation_service.dart';
 import 'package:codeway_image_processing/base/services/navigation_service/routes.dart';
 import 'package:codeway_image_processing/base/services/toast_service/i_toast_service.dart';
 import 'package:codeway_image_processing/features/image_processing/data/repositories/i_processed_image_repository.dart';
+import 'package:codeway_image_processing/features/image_processing/data/services/processed_image_saver.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_model.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/document/document_props.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/processed_image_saver.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
 
@@ -53,22 +53,17 @@ class DocumentVM {
   final _uuid = const Uuid();
 
   void init(DocumentProps props) {
-    final pages =
-        props.pages
-            .map(
-              (page) => DocumentPage(
-                id: _uuid.v4(),
-                originalBytes: page.originalBytes,
-                processedBytes: page.processedBytes,
-              ),
-            )
-            .toList();
+    final pages = props.pages
+        .map(
+          (page) => DocumentPage(
+            id: _uuid.v4(),
+            originalBytes: page.originalBytes,
+            processedBytes: page.processedBytes,
+          ),
+        )
+        .toList();
     _state.value = BaseState.success(
-      DocumentModel(
-        pages: pages,
-        selectedIndex: 0,
-        hasUnsavedChanges: true,
-      ),
+      DocumentModel(pages: pages, selectedIndex: 0, hasUnsavedChanges: true),
     );
   }
 
@@ -110,10 +105,7 @@ class DocumentVM {
     if (_isBusy) return;
     _setProcessingPage(true);
     try {
-      final bytes = await _imagePickerService.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
+      final bytes = await _imagePickerService.pickImage(source: source);
       if (bytes == null) return;
       final page = await _createDocumentPage(bytes);
       if (page == null) {
@@ -140,9 +132,7 @@ class DocumentVM {
     if (_isBusy) return;
     _setProcessingPage(true);
     try {
-      final images = await _imagePickerService.pickMultiImages(
-        imageQuality: 85,
-      );
+      final images = await _imagePickerService.pickMultiImages();
       if (images.isEmpty) return;
       final updated = List<DocumentPage>.from(model.pages);
       var skippedFaces = false;

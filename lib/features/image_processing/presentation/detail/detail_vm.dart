@@ -10,7 +10,7 @@ import 'package:codeway_image_processing/features/image_processing/data/reposito
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_model.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/utils/face_batch_metadata.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
 
@@ -112,22 +112,17 @@ class DetailVM {
     return null;
   }
 
+  /// Deletes files first; on failure the DB row remains so the user can retry.
   Future<void> _deleteEntityAndFiles(ProcessedImage image) async {
-    // Delete files first - if this fails, DB entry remains for retry
     await _fileStorageService.deleteProcessedImageFiles(image);
-    // Only delete DB entry if files are successfully deleted
     await _repository.delete(image.id);
   }
 
+  /// When file is missing: try to clean up DB and files; always update UI and show toast.
   Future<void> _handleMissingFile(ProcessedImage image) async {
-    // Attempt to clean up entity and files, but proceed regardless of success
-    // since files are already missing and we need to update the UI
     try {
       await _deleteEntityAndFiles(image);
-    } catch (_) {
-      // Silently handle deletion failure - files are already missing,
-      // so we proceed to update UI and inform user regardless
-    }
+    } catch (_) {}
     _toastService.show(AppStrings.fileMissingRemoved, type: ToastType.warning);
     _state.value = BaseState.success(model.copyWith(image: null));
     _navigationService.goBack();

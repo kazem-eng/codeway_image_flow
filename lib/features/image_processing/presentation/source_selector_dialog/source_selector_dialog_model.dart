@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:image_picker/image_picker.dart';
 
-/// State model for the source selector dialog.
 class SourceSelectorDialogModel {
   const SourceSelectorDialogModel({
     this.selectedSource,

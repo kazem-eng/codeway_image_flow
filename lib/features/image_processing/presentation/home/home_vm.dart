@@ -12,7 +12,8 @@ import 'package:codeway_image_processing/features/image_processing/presentation/
 import 'package:codeway_image_processing/features/image_processing/presentation/source_selector_dialog/source_selector_dialog_vm.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/home/home_model.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/presentation/utils/document_title_display.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/utils/date_formats.dart';
 import 'package:get/get.dart';
@@ -92,10 +93,9 @@ class HomeVM {
     if (metadata == null || metadata.isEmpty) {
       return AppStrings.pdfDocument;
     }
-    final prefix = AppStrings.documentPrefix;
-    final cleaned = metadata.replaceFirst(
-      RegExp('^$prefix\\s\\d{4}-\\d{2}-\\d{2}\\s-\\s'),
-      '$prefix - ',
+    final cleaned = normalizeDocumentTitleForDisplay(
+      metadata,
+      AppStrings.documentPrefix,
     );
     return cleaned;
   }
@@ -129,8 +129,8 @@ class HomeVM {
     await _deleteImageAndFiles(face);
   }
 
+  /// Deletes files first; on failure the DB row remains so the user can retry.
   Future<void> _deleteImageAndFiles(ProcessedImage image) async {
-    // Delete files first so a failed delete keeps the DB entry for retry.
     await _fileStorageService.deleteProcessedImageFiles(image);
     await _repository.delete(image.id);
   }
@@ -164,7 +164,6 @@ class HomeVM {
       Routes.detail,
       arguments: DetailProps(imageId: image.id),
     );
-    // History will refresh when user returns to home screen
   }
 
   Future<void> openFaceGroup(ProcessedImage image) async {

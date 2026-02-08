@@ -21,26 +21,22 @@ class DocumentActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      spacing: ImageFlowSpacing.md,
       children: [
         Expanded(
           child: OutlinedButton(
             onPressed: isBusy ? null : onAddPage,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(
-                color: ImageFlowColors.primaryStart,
-              ),
+              side: const BorderSide(color: ImageFlowColors.primaryStart),
               foregroundColor: ImageFlowColors.textPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: ImageFlowShapes.roundedMedium(),
               ),
-              minimumSize: const Size.fromHeight(
-                ImageFlowSizes.buttonHeight,
-              ),
+              minimumSize: const Size.fromHeight(ImageFlowSizes.buttonHeight),
             ),
             child: Text(AppStrings.addPage),
           ),
         ),
-        SizedBox(width: ImageFlowSpacing.md),
         Expanded(
           child: ImageFlowButton(
             label: AppStrings.savePdf,

@@ -8,7 +8,6 @@ import 'package:codeway_image_processing/ui_kit/components/imageflow_app_bar.dar
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
-/// Processing screen.
 class ProcessingView extends StatelessWidget {
   const ProcessingView({super.key, required this.props});
 

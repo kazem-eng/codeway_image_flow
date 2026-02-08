@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' show Rect;
 
-import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
@@ -9,23 +10,54 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart' as pdf_lib;
 import 'package:pdf/widgets.dart' as pdf_widgets;
 
-import '../../base_exception.dart';
-import '../../../../features/image_processing/domain/entities/processed_image/processing_type.dart';
+import 'package:codeway_image_processing/base/base_exception.dart';
+import 'package:codeway_image_processing/base/services/method_channel_service/i_method_channel_service.dart';
+import 'package:codeway_image_processing/base/services/method_channel_service/method_channel_service.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processing_type.dart';
 import 'i_image_processing_service.dart';
+
+/// Channel name for native document/PDF processing on iOS/Android.
+const String kNativeImageProcessingChannelName =
+    'codeway_image_processing/native_image_processing';
 
 /// Image processing using ML Kit (face + text) and image/pdf packages.
 class ImageProcessingService implements IImageProcessingService {
-  static const MethodChannel _nativeChannel = MethodChannel(
-    'codeway_image_processing/native_image_processing',
-  );
+  ImageProcessingService({IMethodChannelService? channelService})
+    : _channelService = channelService ??
+        MethodChannelService(channelName: kNativeImageProcessingChannelName);
 
-  // Document processing uses native pipelines on iOS/Android; faces stay in Dart.
+  final IMethodChannelService _channelService;
+
+  // JPEG encoding quality (0–100)
+  static const int _jpegQualityDefault = 90;
+  static const int _jpegQualityDocumentFallback = 92;
+
+  // Face vs document detection thresholds
+  static const double _minFaceAreaRatioForFace = 0.02;
+  static const double _faceToTextRatioForFace = 1.2;
+  static const double _minTextAreaRatioForDocument = 0.03;
+  static const int _minTextBlocksForDocument = 3;
+
+  // Document heuristic: Sobel edge density (> this ratio = document-like)
+  static const double _edgeRatioThresholdForDocument = 0.05;
+  static const int _edgeIntensityThreshold = 50;
+
+  // Face region: expand bbox by these factors (width, height) to include hair/chin
+  static const double _faceRectExpandWidthFactor = 0.12;
+  static const double _faceRectExpandHeightFactor = 0.16;
+  static const double _contourScaleFactor = 1.02;
+
+  // ML Kit face detector
+  static const double _minFaceSizeForDetection = 0.08;
+
+  // Numerical stability (avoid div-by-zero in point-in-polygon)
+  static const double _epsilon = 1e-6;
+
+  /// True on iOS/Android; document processing may use native pipeline; face detection stays in Dart.
   bool get _useNativeDoc => Platform.isIOS || Platform.isAndroid;
 
   @override
   Future<ProcessingType> detectContentType(Uint8List imageBytes) async {
-    // Always use Dart/ML Kit for face vs document detection.
-    // Native processing is reserved for document flow only.
     return _detectContentTypeDart(imageBytes);
   }
 
@@ -35,34 +67,31 @@ class ImageProcessingService implements IImageProcessingService {
       if (decoded == null) {
         throw ImageProcessingException(message: 'Failed to decode image');
       }
-      // Normalize orientation before ML Kit analysis.
       final oriented = img.bakeOrientation(decoded);
       final orientedBytes = Uint8List.fromList(
-        img.encodeJpg(oriented, quality: 90),
+        img.encodeJpg(oriented, quality: _jpegQualityDefault),
       );
 
-      // First check for faces - if no faces detected, treat as document.
       final faces = await _detectFaces(orientedBytes);
       if (faces.isEmpty) {
-        // No faces detected - check for text/document content.
         final blocks = await _detectTextBlocks(orientedBytes);
         if (blocks.isNotEmpty || _hasDocumentLikeFeatures(oriented)) {
           return ProcessingType.document;
         }
-        // Default to document if no faces and unclear content.
         return ProcessingType.document;
       }
 
-      // Faces detected - compare with text coverage to avoid false positives.
       final blocks = await _detectTextBlocks(orientedBytes);
       final imageArea = oriented.width * oriented.height.toDouble();
       final faceScore = _maxFaceAreaRatio(faces, imageArea);
       final textScore = _textBoundsAreaRatio(blocks, imageArea);
 
-      if (faceScore >= 0.02 && faceScore > textScore * 1.2) {
+      if (faceScore >= _minFaceAreaRatioForFace &&
+          faceScore > textScore * _faceToTextRatioForFace) {
         return ProcessingType.face;
       }
-      if (textScore >= 0.03 || blocks.length >= 3) {
+      if (textScore >= _minTextAreaRatioForDocument ||
+          blocks.length >= _minTextBlocksForDocument) {
         return ProcessingType.document;
       }
       if (faces.isNotEmpty) {
@@ -74,29 +103,23 @@ class ImageProcessingService implements IImageProcessingService {
     }
   }
 
-  /// Check if image has document-like features (edges, structure)
+  /// Heuristic: Sobel edge density; documents usually have more structured edges than photos (>5%).
   bool _hasDocumentLikeFeatures(img.Image image) {
-    // Simple heuristic: use Sobel edges and count high-gradient pixels.
-    // Documents tend to have more structured edges than photos.
     final grayscale = img.grayscale(image.clone());
     final edges = img.sobel(grayscale);
-
-    // Count edge pixels (pixels with high gradient).
     int edgePixelCount = 0;
-    final threshold = 50; // Tuned threshold.
     for (var y = 0; y < edges.height; y++) {
       for (var x = 0; x < edges.width; x++) {
         final pixel = edges.getPixel(x, y);
-        final intensity = pixel.r; // Grayscale, so r=g=b
-        if (intensity > threshold) {
+        final intensity = pixel.r;
+        if (intensity > _edgeIntensityThreshold) {
           edgePixelCount++;
         }
       }
     }
 
     final edgeRatio = edgePixelCount / (edges.width * edges.height);
-    // Documents typically have 5-15% edge pixels.
-    return edgeRatio > 0.05;
+    return edgeRatio > _edgeRatioThresholdForDocument;
   }
 
   double _maxFaceAreaRatio(List<Face> faces, double imageArea) {
@@ -131,7 +154,6 @@ class ImageProcessingService implements IImageProcessingService {
   }
 
   Future<List<Face>> _detectFaces(Uint8List imageBytes) async {
-    // ML Kit expects file paths, so write a temp file per call.
     final tempFile = await _writeTempImage(imageBytes);
     try {
       final inputImage = InputImage.fromFilePath(tempFile.path);
@@ -141,7 +163,7 @@ class ImageProcessingService implements IImageProcessingService {
           enableLandmarks: false,
           enableClassification: false,
           enableTracking: false,
-          minFaceSize: 0.08,
+          minFaceSize: _minFaceSizeForDetection,
           performanceMode: FaceDetectorMode.accurate,
         ),
       );
@@ -166,7 +188,6 @@ class ImageProcessingService implements IImageProcessingService {
   }
 
   Future<List<TextBlock>> _detectTextBlocks(Uint8List imageBytes) async {
-    // ML Kit text recognition also works on file paths.
     final tempFile = await _writeTempImage(imageBytes);
     try {
       final recognizer = TextRecognizer();
@@ -184,8 +205,6 @@ class ImageProcessingService implements IImageProcessingService {
 
   @override
   Future<Uint8List> detectAndProcessFaces(Uint8List imageBytes) async {
-    // Always use Dart/ML Kit for face processing to ensure
-    // consistent behavior across camera/gallery sources.
     return _detectAndProcessFacesDart(imageBytes);
   }
 
@@ -194,23 +213,24 @@ class ImageProcessingService implements IImageProcessingService {
     if (decoded == null) {
       throw ImageProcessingException(message: 'Failed to decode image');
     }
-    // Normalize orientation before detection and pixel edits.
     final oriented = img.bakeOrientation(decoded);
     final orientedBytes = Uint8List.fromList(
-      img.encodeJpg(oriented, quality: 90),
+      img.encodeJpg(oriented, quality: _jpegQualityDefault),
     );
     final faces = await _detectFaces(orientedBytes);
     if (faces.isEmpty) {
       throw FaceDetectionException(message: 'No faces detected');
     }
 
-    // Apply grayscale only inside the face region(s).
     img.Image result = oriented.clone();
     final scaleX = oriented.width.toDouble();
     final scaleY = oriented.height.toDouble();
     for (final face in faces) {
-      // Expand the bounding box slightly to avoid harsh edges.
-      final rect = _expandRect(face.boundingBox, 0.12, 0.16);
+      final rect = _expandRect(
+        face.boundingBox,
+        _faceRectExpandWidthFactor,
+        _faceRectExpandHeightFactor,
+      );
       final left = (rect.left.clamp(0.0, scaleX)).toInt();
       final top = (rect.top.clamp(0.0, scaleY)).toInt();
       final width = (rect.width.clamp(1.0, scaleX - left)).toInt();
@@ -223,29 +243,28 @@ class ImageProcessingService implements IImageProcessingService {
         width: width,
         height: height,
       );
-      // Prefer contour polygon when available; otherwise fallback to ellipse mask.
       final contour = face.contours[FaceContourType.face]?.points ?? [];
       final masked = contour.isNotEmpty
           ? _applyContourGrayscale(
               crop,
-              _scalePolygon(
-                contour
-                    .map(
-                      (p) => Point<double>(
-                        p.x.toDouble() - left,
-                        p.y.toDouble() - top,
-                      ),
-                    )
-                    .toList(),
-                1.02,
-                crop.width.toDouble(),
-                crop.height.toDouble(),
-              ),
+                _scalePolygon(
+                  contour
+                      .map(
+                        (p) => Point<double>(
+                          p.x.toDouble() - left,
+                          p.y.toDouble() - top,
+                        ),
+                      )
+                      .toList(),
+                  _contourScaleFactor,
+                  crop.width.toDouble(),
+                  crop.height.toDouble(),
+                ),
             )
           : _applyEllipseGrayscale(crop);
       result = img.compositeImage(result, masked, dstX: left, dstY: top);
     }
-    return Uint8List.fromList(img.encodeJpg(result, quality: 90));
+    return Uint8List.fromList(img.encodeJpg(result, quality: _jpegQualityDefault));
   }
 
   img.Image _applyContourGrayscale(
@@ -270,8 +289,8 @@ class ImageProcessingService implements IImageProcessingService {
     return output;
   }
 
+  /// Expands rect about center (e.g. to include hair/chin in face crop).
   Rect _expandRect(Rect rect, double widthFactor, double heightFactor) {
-    // Expand about the center so the crop includes hair/chin margins.
     final expandX = rect.width * widthFactor;
     final expandY = rect.height * heightFactor;
     return Rect.fromLTRB(
@@ -288,7 +307,6 @@ class ImageProcessingService implements IImageProcessingService {
     double maxWidth,
     double maxHeight,
   ) {
-    // Scale polygon around centroid and clamp to bounds.
     if (polygon.isEmpty || scale == 1.0) return polygon;
     double cx = 0;
     double cy = 0;
@@ -308,8 +326,8 @@ class ImageProcessingService implements IImageProcessingService {
     }).toList();
   }
 
+  /// Ray-casting point-in-polygon test.
   bool _pointInPolygon(double x, double y, List<Point<double>> polygon) {
-    // Ray-casting point-in-polygon test.
     var inside = false;
     for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       final xi = polygon[i].x;
@@ -318,14 +336,14 @@ class ImageProcessingService implements IImageProcessingService {
       final yj = polygon[j].y;
       final intersect =
           (yi > y) != (yj > y) &&
-          x < ((xj - xi) * (y - yi)) / (yj - yi + 0.000001) + xi;
+          x < ((xj - xi) * (y - yi)) / (yj - yi + _epsilon) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
   }
 
+  /// Ellipse mask when face contour is unavailable.
   img.Image _applyEllipseGrayscale(img.Image faceCrop) {
-    // Elliptical mask fallback when no contours are available.
     final w = faceCrop.width;
     final h = faceCrop.height;
     final cx = (w - 1) / 2.0;
@@ -353,29 +371,22 @@ class ImageProcessingService implements IImageProcessingService {
   @override
   Future<Uint8List> processDocument(Uint8List imageBytes) async {
     if (_useNativeDoc) {
-      try {
-        // Native pipeline handles edge detection + perspective correction.
-        final processed = await _nativeChannel.invokeMethod<Uint8List>(
-          'processDocument',
-          imageBytes,
-        );
-        if (processed != null) return processed;
-      } on PlatformException {
-        // Fall back to Dart implementation
-      }
+      final processed = await _channelService.processDocument(imageBytes);
+      if (processed != null) return processed;
     }
     return _processDocumentDart(imageBytes);
   }
 
+  /// Dart fallback when native document processing is unavailable.
   Future<Uint8List> _processDocumentDart(Uint8List imageBytes) async {
     final decoded = img.decodeImage(imageBytes);
     if (decoded == null) {
       throw ImageProcessingException(message: 'Failed to decode image');
     }
-    // Dart fallback: just fix orientation and pass the photo through.
-    // The resulting PDF will show exactly the captured image.
     final oriented = img.bakeOrientation(decoded);
-    return Uint8List.fromList(img.encodeJpg(oriented, quality: 92));
+    return Uint8List.fromList(
+      img.encodeJpg(oriented, quality: _jpegQualityDocumentFallback),
+    );
   }
 
   @override
@@ -384,16 +395,11 @@ class ImageProcessingService implements IImageProcessingService {
     String title,
   ) async {
     if (_useNativeDoc) {
-      try {
-        // Native PDF for single-page images to match platform rendering.
-        final pdfBytes = await _nativeChannel.invokeMethod<Uint8List>(
-          'createPdfFromImage',
-          {'bytes': imageBytes, 'title': title},
-        );
-        if (pdfBytes != null) return pdfBytes;
-      } on PlatformException {
-        // Fall back to Dart implementation
-      }
+      final pdfBytes = await _channelService.createPdfFromImage(
+        imageBytes,
+        title,
+      );
+      if (pdfBytes != null) return pdfBytes;
     }
     return _createPdfFromImageDart(imageBytes, title);
   }
@@ -406,7 +412,6 @@ class ImageProcessingService implements IImageProcessingService {
     if (imageBytes.isEmpty) {
       throw ImageProcessingException(message: 'No pages provided');
     }
-    // Multi-page PDFs are built in Dart for deterministic output.
     return _createPdfFromImagesDart(imageBytes, title);
   }
 
@@ -416,8 +421,6 @@ class ImageProcessingService implements IImageProcessingService {
   ) async {
     final pdf = pdf_widgets.Document(title: title);
     final imageProvider = pdf_widgets.MemoryImage(imageBytes);
-
-    // A4 page dimensions in points.
     final pageWidth = pdf_lib.PdfPageFormat.a4.width;
     final pageHeight = pdf_lib.PdfPageFormat.a4.height;
 
@@ -447,8 +450,6 @@ class ImageProcessingService implements IImageProcessingService {
     final pageFormat = pdf_lib.PdfPageFormat.a4;
     final pageWidth = pageFormat.width;
     final pageHeight = pageFormat.height;
-
-    // Add one page per processed image.
     for (final bytes in imageBytes) {
       final imageProvider = pdf_widgets.MemoryImage(bytes);
       pdf.addPage(

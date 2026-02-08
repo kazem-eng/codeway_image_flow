@@ -26,6 +26,7 @@ class BaseState<T> {
   bool get isSuccess => type == BaseStateType.success;
   bool get isError => type == BaseStateType.error;
 
+  /// Pattern matching for state values
   R maybeWhen<R>({
     R Function()? loading,
     R Function(T data)? success,

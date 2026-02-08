@@ -9,7 +9,7 @@ import 'package:codeway_image_processing/features/image_processing/domain/entiti
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_model.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
 import 'package:codeway_image_processing/features/image_processing/presentation/detail/detail_props.dart';
-import 'package:codeway_image_processing/features/image_processing/utils/face_batch_metadata.dart';
+import 'package:codeway_image_processing/features/image_processing/domain/utils/face_batch_metadata.dart';
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:get/get.dart';
 

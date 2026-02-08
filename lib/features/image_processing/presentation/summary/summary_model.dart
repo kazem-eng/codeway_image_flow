@@ -1,7 +1,6 @@
 import 'package:codeway_image_processing/features/image_processing/presentation/summary/summary_props.dart';
 import 'package:codeway_image_processing/features/image_processing/domain/entities/processed_image/processed_image.dart';
 
-/// Summary model.
 class SummaryModel {
   const SummaryModel({
     this.faces = const [],

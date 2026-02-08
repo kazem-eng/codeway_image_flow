@@ -84,6 +84,7 @@ class RoutesHandler {
   }
 }
 
+/// Redirects to [route] after first frame; used when route arguments are invalid.
 class _RedirectToRoute extends StatefulWidget {
   const _RedirectToRoute({required this.route});
 

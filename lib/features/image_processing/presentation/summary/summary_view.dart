@@ -8,7 +8,6 @@ import 'package:codeway_image_processing/ui_kit/components/imageflow_app_bar.dar
 import 'package:codeway_image_processing/ui_kit/strings/app_strings.dart';
 import 'package:codeway_image_processing/ui_kit/styles/styles_export.dart';
 
-/// Summary screen.
 class SummaryView extends StatelessWidget {
   const SummaryView({super.key, required this.props});
 
